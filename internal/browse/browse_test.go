@@ -163,3 +163,20 @@ func TestPositionsWithStyledOutput(t *testing.T) {
 		}
 	}
 }
+
+func TestTableLinksAreFoundInRenderedText(t *testing.T) {
+	body := "# Front\n\n| Collection | Feeds |\n| --- | --- |\n| [SoCal](socal.html) | [RSS](socal.xml), [OPML](socal.opml) |\n| [Pacific](pacific.html) | |\n"
+	srv := pageServer(t, body)
+	v, err := Open(context.Background(), srv.URL+"/p.md", render.Glamour{Style: "notty"}, 80)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(v.Links) != 4 {
+		t.Fatalf("links %#v", v.Links)
+	}
+	for n := 1; n <= 4; n++ {
+		if _, ok := v.LineOf(n); !ok {
+			t.Errorf("link %d not found in:\n%s", n, v.Display(-1))
+		}
+	}
+}

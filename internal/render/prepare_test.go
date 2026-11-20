@@ -61,3 +61,20 @@ func TestPrepareNoLinksNoChange(t *testing.T) {
 		t.Errorf("%q %#v", got, links)
 	}
 }
+
+// The antenna front page is a table of links. Prepare must parse it the way
+// glamour does (GFM tables), or link numbers and markers disagree with what is
+// rendered.
+func TestPrepareNumbersLinksInTables(t *testing.T) {
+	src := "| Collection | Feeds |\n| --- | --- |\n| [SoCal](socal.html) | [RSS](socal.xml), [OPML](socal.opml) |\n| [Pacific](pacific.html) | |\n"
+	got, links := Prepare(src)
+	if len(links) != 4 || links[0].Dest != "socal.html" || links[3].Dest != "pacific.html" {
+		t.Fatalf("links %#v", links)
+	}
+	plain := strings.ReplaceAll(strings.ReplaceAll(got, "\\", ""), Sentinel, "")
+	for _, marker := range []string{"SoCal [1]", "RSS [2]", "OPML [3]", "Pacific [4]"} {
+		if !strings.Contains(plain, marker) {
+			t.Errorf("no %q in %q", marker, plain)
+		}
+	}
+}

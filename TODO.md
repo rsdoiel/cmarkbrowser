@@ -28,6 +28,16 @@ Not applicable yet, because this is a concept experiment with nothing to release
 - [ ] Learn from using A, then decide keys with the author: arrows for focus as in lynx or for scrolling; a links list; `g` to type an address. Known limits: only the marker is highlighted, not the whole link text; a link with no found marker cannot be focused.
 - [ ] Decide when to leave glamour (focusable links, layout glamour cannot do, tables) and move to an own renderer over a span-based intermediate form; see the design brief.
 
+## Found against the live sites (2026-11-19)
+
+https://rsdoiel.github.io/blog/index.md and https://rsdoiel.github.io/antenna/index.md already open, as do their post and collection `.md` files (GitHub Pages sends `text/markdown`). `/.well-known/toc.opml` there is 404.
+
+- [x] cmarkbrowser tries the same address first (so a server that negotiates Markdown on `Accept`, as some CDNs do for agents, is respected), then the Markdown copy: `a.html` to `a.md`, a directory to its `index.md` (`page.Fetch`, 2026-11-19; checked on the live blog and antenna sites). Anything else (`.xml`, `.opml`) is not a page.
+- [ ] Every link in those `.md` files points at `.html` (154 of 154 on the blog index; `.html`, `.xml` and `.opml` on the antenna front page), so following one is an error. Two fixes: antennaApp writes `.md` links into its Markdown copies (the real fix), and cmarkbrowser tries the `.md` sibling of a same-site `.html` link first, as BonBon's `urlMirrorOf` does.
+- [ ] Following a link to a non-Markdown page: HTML opens in the system browser or says so, XML and OPML show as source text (BonBon's rules), images are noted. Today it is only an error line.
+- [ ] glamour renders a table link as `text [N][M]` and adds a reference list under the table with its own numbers, so a page with prose links before a table shows two numbers for each table link (ours is the one that works). Seen on the antenna front page. A reason to move to our own renderer.
+- [ ] Parse in `render.Prepare` with the extensions glamour uses (GFM, DefinitionList) so the two never disagree about what a link is; no failing case found yet.
+
 ## Browsing
 
 - [ ] Fetch a page with `Accept: text/markdown, text/x-opml`. A page is `text/markdown`, or `text/plain` or a generic binary type with a `.md` or `.markdown` path. HTML and XML show as source; images are not shown at first.

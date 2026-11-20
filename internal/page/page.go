@@ -28,6 +28,18 @@ var (
 	ErrUnavailable = errors.New("server unavailable")
 )
 
+// errNotMarkdown marks a good response that is not a Markdown page. It is
+// always wrapped with ErrData; Fetch uses it to decide to try a sibling.
+var errNotMarkdown = errors.New("not Markdown")
+
+// notMarkdown is the error for a good response that is not a page. It reads as
+// one message, is an ErrData, and is also errNotMarkdown.
+type notMarkdown struct{ msg string }
+
+func (e *notMarkdown) Error() string        { return e.msg }
+func (e *notMarkdown) Is(target error) bool { return target == errNotMarkdown }
+func (e *notMarkdown) Unwrap() error        { return ErrData }
+
 // Accept is the Accept header BonBon sends with every page request.
 const Accept = "text/markdown, text/x-opml"
 
@@ -161,14 +173,19 @@ func IsMarkdown(contentType, p string) bool {
 	return mt == "text/plain" || mt == "application/octet-stream" || mt == "binary/octet-stream" || mt == ""
 }
 
-/** Fetch gets a page with BonBon's Accept header and parses it.
+/** Fetch gets a page with BonBon's Accept header and parses it. When the
+ * server answers a link to an HTML page or a directory with something that is
+ * not Markdown, it then tries the Markdown copy of the same page (a.html to
+ * a.md, a directory to its index.md), the way BonBon's urlMirrorOf maps links.
+ * The same address is always tried first, so a server that negotiates
+ * Markdown on Accept (as some CDNs do for software agents) is respected.
  *
  * Parameters:
  *   ctx (context.Context) — cancellation and deadline
  *   rawurl (string) — an http or https address
  *
  * Returns:
- *   *Page — the page
+ *   *Page — the page; its URL is the address that served it
  *   error — wraps ErrUnavailable (cannot connect), ErrNoInput (404 or 410),
  *     or ErrData (not Markdown, bad front matter, other bad status)
  *
@@ -176,6 +193,41 @@ func IsMarkdown(contentType, p string) bool {
  *   p, err := page.Fetch(ctx, "https://dave.writersweb.org/")
  */
 func Fetch(ctx context.Context, rawurl string) (*Page, error) {
+	p, err := fetchOne(ctx, rawurl)
+	if err == nil || !errors.Is(err, errNotMarkdown) {
+		return p, err
+	}
+	sib := markdownSibling(rawurl)
+	if sib == "" {
+		return nil, err
+	}
+	if p, err2 := fetchOne(ctx, sib); err2 == nil {
+		return p, nil
+	}
+	return nil, err
+}
+
+// markdownSibling returns the address of the Markdown copy of an HTML page or
+// directory address, or "" when the address is neither.
+func markdownSibling(rawurl string) string {
+	u, err := url.Parse(rawurl)
+	if err != nil {
+		return ""
+	}
+	switch ext := strings.ToLower(path.Ext(u.Path)); {
+	case ext == ".html" || ext == ".htm":
+		u.Path = strings.TrimSuffix(u.Path, path.Ext(u.Path)) + ".md"
+	case strings.HasSuffix(u.Path, "/"):
+		u.Path += "index.md"
+	default:
+		return ""
+	}
+	u.Fragment = ""
+	return u.String()
+}
+
+// fetchOne gets one address and parses it as a page.
+func fetchOne(ctx context.Context, rawurl string) (*Page, error) {
 	u, err := url.Parse(rawurl)
 	if err != nil || (u.Scheme != "http" && u.Scheme != "https") {
 		return nil, fmt.Errorf("%w: %q is not an http or https address", ErrData, rawurl)
@@ -198,7 +250,7 @@ func Fetch(ctx context.Context, rawurl string) (*Page, error) {
 		return nil, fmt.Errorf("%w: %s: %s", ErrData, rawurl, resp.Status)
 	}
 	if !IsMarkdown(resp.Header.Get("Content-Type"), resp.Request.URL.Path) {
-		return nil, fmt.Errorf("%w: %s is not Markdown (%s)", ErrData, rawurl, resp.Header.Get("Content-Type"))
+		return nil, &notMarkdown{fmt.Sprintf("%s: %s is not Markdown (%s)", ErrData, rawurl, resp.Header.Get("Content-Type"))}
 	}
 	body, err := io.ReadAll(io.LimitReader(resp.Body, maxBody+1))
 	if err != nil {

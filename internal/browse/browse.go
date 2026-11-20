@@ -34,12 +34,15 @@ type Link struct {
  *   Text (string) — the rendered, styled text, with a Sentinel before each
  *     link marker; use Display to get text fit to show
  *   Links ([]Link) — the numbered links, in reading order
+ *   Missing ([]string) — {{page.KEY}} macros left in the text because the
+ *     front matter has no such value
  */
 type View struct {
-	Page  *page.Page
-	Clean string
-	Text  string
-	Links []Link
+	Page    *page.Page
+	Clean   string
+	Text    string
+	Links   []Link
+	Missing []string
 
 	lines map[int]int // link number -> line of its marker in Text
 }
@@ -89,12 +92,13 @@ func Open(ctx context.Context, addr string, r render.Renderer, width int) (*View
 	if err != nil {
 		return nil, err
 	}
-	clean, links := render.Prepare(p.Body)
+	body, missing := render.Expand(p.Body, p.Meta)
+	clean, links := render.Prepare(body)
 	text, err := r.Render(clean, width)
 	if err != nil {
 		return nil, fmt.Errorf("rendering %s: %w", addr, err)
 	}
-	v := &View{Page: p, Clean: clean, Text: text}
+	v := &View{Page: p, Clean: clean, Text: text, Missing: missing}
 	v.index()
 	for _, l := range links {
 		// A link that cannot be resolved stays in the text but is not followable.

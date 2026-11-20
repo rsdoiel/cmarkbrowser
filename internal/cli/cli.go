@@ -94,6 +94,9 @@ func runDump(addr string, r render.Renderer, width int, stdout, stderr io.Writer
 	if err != nil {
 		return fail(stderr, err)
 	}
+	for _, key := range v.Missing {
+		fmt.Fprintf(stderr, "cmarkbrowser: warning: %s: no front matter value for {{page.%s}}\n", v.Page.URL, key)
+	}
 	fmt.Fprint(stdout, v.Display(-1))
 	if len(v.Links) > 0 {
 		fmt.Fprintln(stdout, "\nLinks:")

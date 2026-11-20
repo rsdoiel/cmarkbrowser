@@ -180,3 +180,25 @@ func TestTableLinksAreFoundInRenderedText(t *testing.T) {
 		}
 	}
 }
+
+func TestOpenExpandsPageMacrosAndReportsMissing(t *testing.T) {
+	mux := http.NewServeMux()
+	mux.HandleFunc("/s.md", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/markdown")
+		w.Write([]byte("---\ntitle: Story One\nauthor: Dave\n---\n# {{page.title}}\n\nBy {{page.author}} on {{page.pubDate}}.\n\n`{{page.title}}`\n"))
+	})
+	srv := httptest.NewServer(mux)
+	defer srv.Close()
+	v, err := Open(context.Background(), srv.URL+"/s.md", render.Glamour{Style: "notty"}, 70)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, want := range []string{"Story One", "By Dave", "{{page.pubDate}}", "{{page.title}}"} {
+		if !strings.Contains(v.Text, want) {
+			t.Errorf("%q not in %q", want, v.Text)
+		}
+	}
+	if len(v.Missing) != 1 || v.Missing[0] != "pubDate" {
+		t.Errorf("Missing = %v", v.Missing)
+	}
+}

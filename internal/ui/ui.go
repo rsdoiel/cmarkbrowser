@@ -116,6 +116,9 @@ func (m Model) loaded(msg loadMsg) Model {
 		return m
 	}
 	m.status = ""
+	if len(msg.v.Missing) > 0 {
+		m.status = "no front matter value for {{page." + strings.Join(msg.v.Missing, "}}, {{page.") + "}}"
+	}
 	m.view = msg.v
 	addr := msg.v.Page.URL
 	if msg.idx < 0 {

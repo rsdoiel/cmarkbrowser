@@ -40,7 +40,7 @@ https://rsdoiel.github.io/blog/index.md and https://rsdoiel.github.io/antenna/in
 
 ## Found on Dave's site (2026-11-19)
 
-- [ ] Pages there start with `# {{page.title}}` and `By {{page.author}} on {{page.pubDate}}.` (BonBon draws none of them itself), so cmarkbrowser shows literal braces on a story page such as https://dave.writersweb.org/scripting/2026/11/03/172109.md until it expands `{{page.NAME}}` from the front matter. Macros are not expanded inside code spans or code blocks (author, 2026-11-19: sample code must be able to show them), expansion is one pass with no re-expansion of a value, and nested keys are checked against a running BonBon first.
+- [x] (2026-11-19) `render.Expand` expands `{{page.KEY}}` from the front matter before `Prepare`: text only (not code spans or blocks), one pass, values escaped, dotted keys reach nested tables (`source.title`), lists join with commas; a missing key (or a table) stays visible and is reported (`-dump` warns on stderr, the TUI shows it in the status line). Checked on https://dave.writersweb.org/scripting/2026/11/03/172109.md. Left: `link` turning the expanded title into a link (antennaApp's extension, DR-0009), and BonBon's own handling of nested keys, not checked against a running BonBon.
 - [ ] Those pages give `urlPrev`, `urlNext` and (not in BonBon's list of eight) `urlParent` in front matter; use the first two for previous and next keys.
 - [ ] The Markdown site mirrors an HTML site: `dave.writersweb.org/scripting/.well-known/bonbon.json` has `urlMirrorOf: http://scripting.com/`, `urlSearch` and `urlUpdateSocket`; `/.well-known/toc.opml` at the root has an `include` outline for it. scripting.com itself serves HTML only (no `index.md`, no `.well-known` files).
 

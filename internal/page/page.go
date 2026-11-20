@@ -273,6 +273,7 @@ type attempt struct {
 	status      int
 	contentType string
 	server      string
+	location    string // the Content-Location header as sent
 	bytes       int
 }
 
@@ -299,7 +300,7 @@ func fetchOne(ctx context.Context, rawurl, role string) (*Page, error) {
 		outcome = "error"
 	}
 	debuglog.FromContext(ctx).Event("fetch.try", "role", role, "url", rawurl, "status", a.status,
-		"content_type", a.contentType, "server", a.server, "bytes", a.bytes, "outcome", outcome, "ms", time.Since(start), "err", err)
+		"content_type", a.contentType, "server", a.server, "content_location", a.location, "bytes", a.bytes, "outcome", outcome, "ms", time.Since(start), "err", err)
 	return p, err
 }
 
@@ -319,7 +320,7 @@ func fetchAttempt(ctx context.Context, rawurl string, a *attempt) (*Page, error)
 		return nil, fmt.Errorf("%w: %s", ErrUnavailable, err)
 	}
 	defer resp.Body.Close()
-	a.status, a.contentType, a.server = resp.StatusCode, resp.Header.Get("Content-Type"), resp.Header.Get("Server")
+	a.status, a.contentType, a.server, a.location = resp.StatusCode, resp.Header.Get("Content-Type"), resp.Header.Get("Server"), resp.Header.Get("Content-Location")
 	switch {
 	case resp.StatusCode == http.StatusNotFound || resp.StatusCode == http.StatusGone:
 		return nil, fmt.Errorf("%w: %s: %s", ErrNoInput, rawurl, resp.Status)
@@ -358,7 +359,47 @@ func fetchAttempt(ctx context.Context, rawurl string, a *attempt) (*Page, error)
 		return nil, err
 	}
 	p.URL = resp.Request.URL.String()
+	if loc := contentLocation(resp); loc != "" {
+		p.URL = loc
+	}
 	return p, nil
+}
+
+/** contentLocation returns the address a response says its content is at, from
+ * its Content-Location header, resolved against the address that answered (after
+ * redirects), or "" when there is none or it cannot be trusted. BonBon honours
+ * the header: it is how a folder's page finds itself, and how an HTML address
+ * answered with Markdown names the Markdown file, so relative links in it, a
+ * bookmark and history all use the right address. Only the same scheme and host
+ * count (a server cannot make a page seem to come from elsewhere); a fragment
+ * is dropped.
+ *
+ * Parameters:
+ *   resp (*http.Response) — the response
+ *
+ * Returns:
+ *   string — the absolute address, or ""
+ *
+ * Example:
+ *   // Content-Location: index.md on a response to http://x.org/dir/
+ *   contentLocation(resp) // "http://x.org/dir/index.md"
+ */
+func contentLocation(resp *http.Response) string {
+	h := strings.TrimSpace(resp.Header.Get("Content-Location"))
+	if h == "" || resp.Request == nil {
+		return ""
+	}
+	ref, err := url.Parse(h)
+	if err != nil {
+		return ""
+	}
+	base := resp.Request.URL
+	abs := base.ResolveReference(ref)
+	if abs.Scheme != base.Scheme || abs.Host != base.Host {
+		return ""
+	}
+	abs.Fragment = ""
+	return abs.String()
 }
 
 /** declaredAlternate returns the address of the Markdown page that an HTML

@@ -348,3 +348,26 @@ func TestOpenFileGetsTheSameMacrosAsAPage(t *testing.T) {
 		t.Errorf("a local Markdown file gets the same macros as a page: %v\n%s", err, v.Text)
 	}
 }
+
+// The case that was wrong: an HTML address answered with Markdown from another
+// folder. Its relative links belong to the Markdown's folder, not the HTML's.
+func TestRelativeLinksResolveAgainstTheContentLocation(t *testing.T) {
+	mux := http.NewServeMux()
+	mux.HandleFunc("/sub/page.html", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/markdown; charset=utf-8")
+		w.Header().Set("Content-Location", "/other/items.md")
+		w.Write([]byte("# Items\n\n[next](next.md) and [up](../top.md)\n"))
+	})
+	srv := httptest.NewServer(mux)
+	defer srv.Close()
+	v, err := Open(context.Background(), srv.URL+"/sub/page.html", render.Glamour{Style: "notty"}, 80)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if v.Page.URL != srv.URL+"/other/items.md" {
+		t.Errorf("page address %q", v.Page.URL)
+	}
+	if len(v.Links) != 2 || v.Links[0].URL != srv.URL+"/other/next.md" || v.Links[1].URL != srv.URL+"/top.md" {
+		t.Errorf("links %#v: want them resolved against /other/, where the Markdown is", v.Links)
+	}
+}

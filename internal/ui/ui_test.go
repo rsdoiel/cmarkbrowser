@@ -912,3 +912,51 @@ func TestBookmarkIsLogged(t *testing.T) {
 		t.Errorf("log:\n%s", buf.String())
 	}
 }
+
+// A folder or HTML address answered with Markdown from its own file: the title
+// line, the bookmark and history all name the Markdown.
+func TestContentLocationIsWhatIsShownBookmarkedAndRevisited(t *testing.T) {
+	hits := map[string]int{}
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		hits[r.URL.Path]++
+		w.Header().Set("Content-Type", "text/markdown; charset=utf-8")
+		switch r.URL.Path {
+		case "/start.md":
+			fmt.Fprint(w, "# Start\n\n[go](/dir/)\n")
+		case "/dir/":
+			w.Header().Set("Content-Location", "/dir/index.md")
+			fmt.Fprint(w, "# Folder page\n\n[sibling](other.md)\n")
+		case "/dir/index.md":
+			fmt.Fprint(w, "# Folder page\n\n[sibling](other.md)\n")
+		case "/dir/other.md":
+			fmt.Fprint(w, "# Sibling\n")
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer srv.Close()
+	bm := filepath.Join(t.TempDir(), "bookmarks.md")
+	m := New(srv.URL+"/start.md", render.Glamour{Style: "notty"}).WithBookmarks(bm)
+	m = drive(t, m, m.Init())
+	next, _ := m.Update(tea.WindowSizeMsg{Width: 140, Height: 24})
+	m = next.(Model)
+	m = press(t, m, "1", "enter") // the folder address
+	if first := strings.SplitN(m.View().Content, "\n", 2)[0]; !strings.Contains(first, srv.URL+"/dir/index.md") {
+		t.Errorf("title line %q should name the Markdown file", first)
+	}
+	m = press(t, m, "m")
+	if b := mustRead(t, bm); !strings.Contains(b, "("+srv.URL+"/dir/index.md)") {
+		t.Errorf("the bookmark should name the Markdown file:\n%s", b)
+	}
+	m = press(t, m, "1", "enter") // a relative link in it: /dir/other.md, not /other.md
+	if !strings.Contains(m.View().Content, "Sibling") {
+		t.Fatalf("relative link did not resolve against the folder:\n%s", m.View().Content)
+	}
+	m = press(t, m, "b") // back: the Markdown address is fetched, not the folder's
+	if !strings.Contains(m.View().Content, "Folder page") {
+		t.Errorf("back:\n%s", m.View().Content)
+	}
+	if hits["/dir/index.md"] == 0 {
+		t.Errorf("history should return to /dir/index.md; hits %v", hits)
+	}
+}

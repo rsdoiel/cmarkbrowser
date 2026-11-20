@@ -69,7 +69,7 @@ https://rsdoiel.github.io/blog/index.md and https://rsdoiel.github.io/antenna/in
 
 ## Content-Location (2026-11-19)
 
-- [ ] Honor `Content-Location` (BonBon does, and the preview server now sends it: antennaApp DR-0010). Today a page's address is the one asked for, so when a server answers an HTML address with Markdown from another file, the address shown, a bookmark, and the base that relative links resolve against are all the HTML's; if the Markdown lives in another folder (`sub/page.html` declaring `../other/items.md`) its relative links resolve wrongly. Use the header, resolved against the request address and limited to the same host, as the page's address in `page.fetchAttempt`.
+- [x] (2026-11-19) Honor `Content-Location`. The header, resolved against the address that answered (after redirects), becomes the page's address when it is http or https on the same scheme and host (a fragment is dropped; another host, scheme or a bad value is ignored, so a server cannot make a page seem to come from elsewhere). The title line, history, bookmarks and the base for relative links (and `urlPrev`/`urlNext`) all use it: on the real preview, `/sub/page.html` answered with `/other/items.md` now resolves its relative link `next.md` to `/other/next.md` (it went to `/sub/next.md`), and `/dir/` is `/dir/index.md`. Applies to the first request, a declared alternate and a sibling; logged as `content_location` on `fetch.try`. A bookmark of a page the preview negotiated names the Markdown file.
 
 ## Browsing
 

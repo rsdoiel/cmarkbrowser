@@ -176,7 +176,7 @@ func IsMarkdown(contentType, p string) bool {
 /** Fetch gets a page with BonBon's Accept header and parses it. When the
  * server answers a link to an HTML page or a directory with something that is
  * not Markdown, it then tries the Markdown copy of the same page (a.html to
- * a.md, a directory to its index.md), the way BonBon's urlMirrorOf maps links.
+ * a.md, a directory or a bare site address to its index.md), the way BonBon's urlMirrorOf maps links.
  * The same address is always tried first, so a server that negotiates
  * Markdown on Accept (as some CDNs do for software agents) is respected.
  *
@@ -217,6 +217,9 @@ func markdownSibling(rawurl string) string {
 	switch ext := strings.ToLower(path.Ext(u.Path)); {
 	case ext == ".html" || ext == ".htm":
 		u.Path = strings.TrimSuffix(u.Path, path.Ext(u.Path)) + ".md"
+	case u.Path == "":
+		// A site address with no path (http://localhost:8000) is the root directory.
+		u.Path = "/index.md"
 	case strings.HasSuffix(u.Path, "/"):
 		u.Path += "index.md"
 	default:

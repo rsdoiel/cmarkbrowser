@@ -125,7 +125,9 @@ func mirrorSite(t *testing.T, negotiate bool) (*httptest.Server, map[string]int)
 			md("# From md\n")
 		case "/dir/index.md":
 			md("# Dir index\n")
-		case "/a.html", "/dir/":
+		case "/index.md":
+			md("# Site root\n")
+		case "/a.html", "/dir/", "/":
 			if negotiate && strings.Contains(r.Header.Get("Accept"), "text/markdown") {
 				md("# Negotiated\n")
 				return
@@ -149,6 +151,21 @@ func TestFetchHTMLLinkFallsBackToMarkdownSibling(t *testing.T) {
 	}
 	if !strings.HasSuffix(p.URL, "/a.md") || !strings.Contains(p.Body, "From md") {
 		t.Errorf("url %q body %q", p.URL, p.Body)
+	}
+}
+
+// A site's address is often typed with no path at all, as antenna preview
+// prints it: http://localhost:8000. That is the site root, a directory.
+func TestFetchSiteRootWithNoPathFallsBackToIndexMd(t *testing.T) {
+	srv, _ := mirrorSite(t, false)
+	for _, addr := range []string{srv.URL, srv.URL + "/", srv.URL + "?x=1"} {
+		p, err := Fetch(context.Background(), addr)
+		if err != nil {
+			t.Fatalf("%s: %s", addr, err)
+		}
+		if !strings.Contains(p.URL, "/index.md") || !strings.Contains(p.Body, "Site root") {
+			t.Errorf("%s: url %q body %q", addr, p.URL, p.Body)
+		}
 	}
 }
 

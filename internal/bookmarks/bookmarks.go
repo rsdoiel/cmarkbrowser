@@ -50,7 +50,7 @@ func Add(path, title, address string, now time.Time) (bool, error) {
 	if label == "" {
 		label = address
 	}
-	entry := fmt.Sprintf("- [%s](%s) (%s)\n", escape(label), dest(address), now.Format("2006-01-02"))
+	entry := Line(label, address, now.Format("2006-01-02")) + "\n"
 
 	existing, err := os.ReadFile(path)
 	switch {
@@ -83,6 +83,25 @@ func Add(path, title, address string, now time.Time) (bool, error) {
 		return true, f.Close()
 	}
 	return false, err
+}
+
+/** Line returns one Markdown list item linking address, with title and stamp
+ * escaped so neither can become markup or HTML. It is how bookmarks and the
+ * history file write their entries.
+ *
+ * Parameters:
+ *   title (string) — the link text
+ *   address (string) — the link destination
+ *   stamp (string) — the text shown in parentheses after the link
+ *
+ * Returns:
+ *   string — "- [title](address) (stamp)", with no newline
+ *
+ * Example:
+ *   bookmarks.Line("A Page", "https://x.org/a", "2026-11-20") // "- [A Page](https://x.org/a) (2026-11-20)"
+ */
+func Line(title, address, stamp string) string {
+	return fmt.Sprintf("- [%s](%s) (%s)", escape(title), dest(address), stamp)
 }
 
 /** Has reports whether the file at path already links address.

@@ -1207,3 +1207,117 @@ func TestALinkWhoseMirrorPageIsMissingGoesWhereItPointed(t *testing.T) {
 		t.Errorf("status %q should name the address as written", m.status)
 	}
 }
+
+func TestOOpensATypedAddressWithoutLeavingTheBrowser(t *testing.T) {
+	m, base := open(t)
+	m = press(t, m, "o")
+	if !strings.Contains(m.View().Content, "open: ") {
+		t.Fatalf("no prompt:\n%s", m.View().Content)
+	}
+	for _, r := range base + "/b.md" {
+		m = press(t, m, string(r))
+	}
+	m = press(t, m, "enter")
+	if out := m.View().Content; !strings.Contains(out, "Beta") {
+		t.Fatalf("after typing the address:\n%s", out)
+	}
+	m = press(t, m, "b") // it is in the session history like any visit
+	if !strings.Contains(m.View().Content, "Alpha") {
+		t.Errorf("back did not return:\n%s", m.View().Content)
+	}
+}
+
+func TestTypedAddressKeysDoNotQuitOrFollowLinks(t *testing.T) {
+	m, _ := open(t)
+	m = press(t, m, "o", "q", "1", "b")
+	if m.addr != "q1b" {
+		t.Errorf("typed %q", m.addr)
+	}
+	m = press(t, m, "esc")
+	if m.addrPrompt || m.addr != "" || !strings.Contains(m.View().Content, "Alpha") {
+		t.Error("Esc should cancel and keep the page")
+	}
+}
+
+func TestATypedAddressWithoutASchemeIsRefusedWithAReason(t *testing.T) {
+	m, _ := open(t)
+	m = press(t, m, "o")
+	for _, r := range "notes.md" {
+		m = press(t, m, string(r))
+	}
+	m = press(t, m, "enter")
+	if !strings.Contains(m.status, "http://") || !strings.Contains(m.View().Content, "Alpha") {
+		t.Errorf("status %q", m.status)
+	}
+}
+
+func TestAHostNameWithoutASchemeGetsHTTPS(t *testing.T) {
+	if got := normalizeAddr("example.org/a.md"); got != "https://example.org/a.md" {
+		t.Errorf("%q", got)
+	}
+	for _, in := range []string{"notes.md", "file:///etc/passwd", "javascript:alert(1)", "", "/etc/passwd", "a b"} {
+		if got := normalizeAddr(in); got != "" {
+			t.Errorf("%q gave %q", in, got)
+		}
+	}
+	if got := normalizeAddr("  http://x.org/a "); got != "http://x.org/a" {
+		t.Errorf("%q", got)
+	}
+}
+
+func TestVisitsAreWrittenToTheHistoryFileNewestFirst(t *testing.T) {
+	srv := site(t)
+	hist := filepath.Join(t.TempDir(), "history.md")
+	m := New(srv.URL+"/a.md", render.Glamour{Style: "notty"}).WithHistory(hist)
+	m = drive(t, m, m.Init())
+	m = press(t, m, "1", "enter")
+	b, err := os.ReadFile(hist)
+	if err != nil {
+		t.Fatal(err)
+	}
+	s := string(b)
+	i, j := strings.Index(s, "/b.md"), strings.Index(s, "/a.md")
+	if i < 0 || j < 0 || i > j {
+		t.Errorf("order wrong:\n%s", s)
+	}
+	m = press(t, m, "b") // going back is a visit too: a moves to the top
+	b, _ = os.ReadFile(hist)
+	if i, j = strings.Index(string(b), "/b.md"), strings.Index(string(b), "/a.md"); j > i {
+		t.Errorf("a should be on top after going back:\n%s", b)
+	}
+}
+
+func TestNoHistoryFileIsWrittenUnlessAsked(t *testing.T) {
+	dir := t.TempDir()
+	t.Chdir(dir)
+	srv := site(t)
+	m := New(srv.URL+"/a.md", render.Glamour{Style: "notty"})
+	m = drive(t, m, m.Init())
+	press(t, m, "1", "enter")
+	if ents, _ := os.ReadDir(dir); len(ents) != 0 {
+		t.Errorf("files written: %v", ents)
+	}
+}
+
+func TestHOpensTheHistoryAsAPageAndItsLinksWork(t *testing.T) {
+	srv := site(t)
+	hist := filepath.Join(t.TempDir(), "history.md")
+	m := New(srv.URL+"/a.md", render.Glamour{Style: "notty"}).WithHistory(hist)
+	m = drive(t, m, m.Init())
+	m = press(t, m, "H")
+	if out := m.View().Content; !strings.Contains(out, "History") || !strings.Contains(out, "Page A") {
+		t.Fatalf("history page:\n%s", out)
+	}
+	m = press(t, m, "1", "enter")
+	if !strings.Contains(m.View().Content, "Alpha") {
+		t.Errorf("following the entry:\n%s", m.View().Content)
+	}
+}
+
+func TestHWithNoHistoryFileSaysHowToTurnItOn(t *testing.T) {
+	m, _ := open(t)
+	m = press(t, m, "H")
+	if !strings.Contains(m.status, "-history") {
+		t.Errorf("status %q", m.status)
+	}
+}

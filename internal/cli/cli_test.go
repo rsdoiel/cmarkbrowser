@@ -322,3 +322,55 @@ func TestDumpRefusesAFileAddress(t *testing.T) {
 		t.Errorf("exit %d, stdout %q: a file: address was read", code, out)
 	}
 }
+
+func TestHistoryFlagNeedsAFileName(t *testing.T) {
+	if code, _, _ := run("-history"); code != ExitUsage {
+		t.Errorf("-history with no value: exit %d, want 2", code)
+	}
+	if code, _, errs := run("-history", "h.md", "-no-history", "https://x.org/"); code != ExitUsage || !strings.Contains(errs, "-no-history") {
+		t.Errorf("both options: exit %d (%s), want 2", code, errs)
+	}
+	// -dump always needs a URL, history or not
+	if code, _, _ := run("-dump", "-history", filepath.Join(t.TempDir(), "h.md")); code != ExitUsage {
+		t.Errorf("-dump with no URL: exit %d, want 2", code)
+	}
+}
+
+// Not a terminal in these tests, so a run that gets as far as starting the
+// browser stops with "needs a terminal"; that is how they tell a start page was found.
+func TestWithNoURLTheBrowserStartsFromHistoryMdInTheWorkingDirectory(t *testing.T) {
+	dir := t.TempDir()
+	t.Chdir(dir)
+	if code, _, errs := run(); code != ExitUsage || !strings.Contains(errs, "no history yet in history.md") {
+		t.Errorf("no history.md: exit %d (%s)", code, errs)
+	}
+	os.WriteFile("history.md", []byte("# History\n\n- [A](https://x.org/a) (2026-11-20 14:03)\n"), 0o644)
+	if code, _, errs := run(); code != ExitUsage || !strings.Contains(errs, "terminal") {
+		t.Errorf("with history.md: exit %d (%s), want a start page and then the terminal check", code, errs)
+	}
+}
+
+func TestNoHistoryMeansNoStartPageEither(t *testing.T) {
+	t.Chdir(t.TempDir())
+	os.WriteFile("history.md", []byte("# History\n"), 0o644)
+	if code, _, errs := run("-no-history"); code != ExitUsage || !strings.Contains(errs, "a URL is needed") || strings.Contains(errs, "terminal") {
+		t.Errorf("exit %d (%s)", code, errs)
+	}
+}
+
+func TestAnExplicitHistoryFileIsTheStartPage(t *testing.T) {
+	hist := filepath.Join(t.TempDir(), "mine.md")
+	os.WriteFile(hist, []byte("# History\n\n- [A](https://x.org/a) (2026-11-20 14:03)\n"), 0o644)
+	if code, _, errs := run("-history", hist); code != ExitUsage || !strings.Contains(errs, "terminal") {
+		t.Errorf("exit %d (%s)", code, errs)
+	}
+}
+
+func TestHelpDocumentsOpenAndHistory(t *testing.T) {
+	_, out, _ := run("-h")
+	for _, want := range []string{"-history FILE", "-no-history", "o asks for an address", "H opens"} {
+		if !strings.Contains(out, want) {
+			t.Errorf("help lacks %q", want)
+		}
+	}
+}

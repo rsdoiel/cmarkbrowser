@@ -69,6 +69,11 @@ type Model struct {
 
 	toc *toc.Finder // the site's table of contents, read when ] or [ needs it
 
+	// an address being typed (o), and the history file (H)
+	addrPrompt bool
+	addr       string
+	histPath   string // "" records nothing
+
 	// bookmarks and local files
 	bmPath     string          // the bookmarks file, "" for bookmarks.md
 	localStart bool            // the start argument is a file the person named
@@ -232,11 +237,14 @@ func (m Model) loaded(msg loadMsg) Model {
 	m.prompt, m.query, m.matches, m.marked, m.pattern, m.cur = false, "", nil, nil, "", 0
 	m.vp.SetContent(msg.v.Display(0))
 	m.vp.GotoTop()
-	return m
+	return m.record()
 }
 
 // key handles one key press.
 func (m Model) key(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
+	if m.addrPrompt {
+		return m.addrKey(msg)
+	}
 	if m.prompt {
 		return m.promptKey(msg)
 	}
@@ -264,6 +272,10 @@ func (m Model) key(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 	case s == "m" && m.num == "":
 		return m.mark(), nil
+	case s == "o" && m.num == "":
+		return m.openAddrPrompt(), nil
+	case s == "H" && m.num == "":
+		return m.openHistory()
 	case s == "B" && m.num == "":
 		return m.openBookmarks()
 	case s == "/" && m.num == "":
@@ -475,6 +487,8 @@ func (m Model) View() tea.View {
 		foot = fmt.Sprintf("/%s  %d of %d  n next  N prev  Esc clear", m.pattern, m.cur+1, len(m.matches))
 	}
 	switch {
+	case m.addrPrompt:
+		foot = "open: " + m.addr + "▏"
 	case m.prompt:
 		foot = "/" + m.query + "▏"
 	case m.status != "":
@@ -489,7 +503,7 @@ func (m Model) View() tea.View {
 			}
 		}
 	}
-	if m.view != nil && m.status == "" && m.num == "" && !m.prompt {
+	if m.view != nil && m.status == "" && m.num == "" && !m.prompt && !m.addrPrompt {
 		foot = fmt.Sprintf("%3.0f%%  %s", m.vp.ScrollPercent()*100, foot)
 	}
 	v := tea.NewView(clip(title, m.w) + "\n" + m.vp.View() + "\n" + clip(foot, m.w))

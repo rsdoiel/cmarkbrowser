@@ -22,6 +22,10 @@ import (
 
 const appName = "cmarkbrowser"
 
+// defaultHistory is the history file when -history names none: in the working
+// directory, like bookmarks.md, so there is no settings file anywhere else.
+const defaultHistory = "history.md"
+
 /** Run parses the command line and runs the program. It never calls os.Exit.
  *
  * Parameters:
@@ -37,8 +41,8 @@ const appName = "cmarkbrowser"
  *   code := cli.Run([]string{"-version"}, os.Stdout, os.Stderr) // 0
  */
 func Run(args []string, stdout, stderr io.Writer) int {
-	var showHelp, showLicense, showVersion, dump bool
-	var style, debugPath, bookmarksPath string
+	var showHelp, showLicense, showVersion, dump, noHistory bool
+	var style, debugPath, bookmarksPath, historyPath string
 	var width int
 	fs := flag.NewFlagSet(appName, flag.ContinueOnError)
 	fs.SetOutput(io.Discard)
@@ -53,6 +57,8 @@ func Run(args []string, stdout, stderr io.Writer) int {
 	fs.IntVar(&width, "width", 80, "columns to wrap to")
 	fs.StringVar(&debugPath, "debug", "", "write a JSON-lines log of the session to this file")
 	fs.StringVar(&bookmarksPath, "bookmarks", "", "the Markdown file m adds to and B opens (default bookmarks.md)")
+	fs.StringVar(&historyPath, "history", "", "the Markdown file that visited pages are recorded in, newest first; H opens it (default history.md)")
+	fs.BoolVar(&noHistory, "no-history", false, "record no history")
 	if err := fs.Parse(args); err != nil {
 		return fail(stderr, fmt.Errorf("%w: %s", ErrUsage, err))
 	}
@@ -73,8 +79,27 @@ func Run(args []string, stdout, stderr io.Writer) int {
 	if dump && fs.NArg() != 1 {
 		return fail(stderr, fmt.Errorf("%w: -dump needs one URL", ErrUsage))
 	}
-	if !dump && fs.NArg() != 1 {
-		return fail(stderr, fmt.Errorf("%w: a URL is needed (try -help)", ErrUsage))
+	if noHistory && historyPath != "" {
+		return fail(stderr, fmt.Errorf("%w: -history and -no-history together", ErrUsage))
+	}
+	// History is on by default, in history.md in the working directory like
+	// bookmarks.md; -no-history turns it off. -dump never records.
+	if historyPath == "" && !noHistory {
+		historyPath = defaultHistory
+	}
+	if noHistory || dump {
+		historyPath = ""
+	}
+	// With no URL the browser starts from the history file, when there is one.
+	start := fs.Arg(0)
+	if !dump && fs.NArg() == 0 {
+		if historyPath == "" {
+			return fail(stderr, fmt.Errorf("%w: a URL is needed (try -help)", ErrUsage))
+		}
+		if _, err := os.Stat(historyPath); err != nil {
+			return fail(stderr, fmt.Errorf("%w: a URL is needed: there is no history yet in %s (try -help)", ErrUsage, historyPath))
+		}
+		start = historyPath
 	}
 	if !dump && !isTerminal(stdout) {
 		return fail(stderr, fmt.Errorf("%w: the browser needs a terminal; use -dump to print a page", ErrUsage))
@@ -98,15 +123,15 @@ func Run(args []string, stdout, stderr io.Writer) int {
 	}
 	// An argument with no scheme is a file the person named; an address needs
 	// http:// or https://. Links never open files (page.Fetch refuses them).
-	local := !strings.Contains(fs.Arg(0), "://")
+	local := !strings.Contains(start, "://")
 	var code int
 	if dump {
 		ctx := debuglog.WithContext(context.Background(), log)
 		code = runDump(ctx, fs.Arg(0), local, render.Glamour{Style: style}, width, stdout, stderr)
 	} else {
-		model := ui.New(fs.Arg(0), render.Glamour{Style: style}).WithDebug(log).WithBookmarks(bookmarksPath)
+		model := ui.New(start, render.Glamour{Style: style}).WithDebug(log).WithBookmarks(bookmarksPath).WithHistory(historyPath)
 		if local {
-			if _, err := os.Stat(fs.Arg(0)); err != nil {
+			if _, err := os.Stat(start); err != nil {
 				code = fail(stderr, fmt.Errorf("%w: %s (an address starts with http:// or https://)", page.ErrNoInput, err))
 				log.Event("exit", "code", code)
 				return code

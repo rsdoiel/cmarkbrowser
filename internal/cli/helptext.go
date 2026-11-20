@@ -19,6 +19,8 @@ const HelpText = `%{app_name}(1) user manual | version {version} {release_hash}
 
 {app_name} [OPTIONS] [URL|FILE]
 
+{app_name} [-history FILE | -no-history]
+
 {app_name} -dump [-style NAME] [-width N] [-debug FILE] URL|FILE
 
 # DESCRIPTION
@@ -57,6 +59,20 @@ page already in it is not added twice. Open it with B, or give it as the
 argument, and follow its links like any page; b comes back to it. Edit it by
 hand if you like.
 
+o asks for an address to open, at the bottom of the screen: type it and press
+Enter (Esc cancels). An address starts with http:// or https://; a bare host
+name such as example.org/a.md gets https://. A file name is refused: typed
+addresses are for the web, and local files are opened only from the command
+line and through B and H. The page joins the session history, so b comes back.
+
+Every page shown is recorded in a history file, history.md in the working
+directory (or the file named by -history FILE), newest first: a list with a
+link and the date and time, and an address visited again moves to the top. The
+list keeps the 500 latest. H opens it as a page, and with no URL on the command
+line {app_name} starts from it, so you can click to where you left off. The file
+is rewritten by {app_name}; keep notes elsewhere. -no-history records nothing;
+-dump never records. The session history (b and f) is kept in memory either way.
+
 Given a file name instead of an address, {app_name} shows that file. Local
 files are opened only that way, and through B: a link in a page, whatever it
 says, never opens one.
@@ -83,6 +99,14 @@ text, links and pictures that have alt text, without scripts, styles or menus.
 
 -bookmarks FILE
 : The Markdown file that m adds to and B opens (default bookmarks.md).
+
+-history FILE
+: Record every page shown in this Markdown file, newest first, and start from
+  it when no URL is given. H opens it. The default is history.md in the working
+  directory.
+
+-no-history
+: Record no history. Cannot be combined with -history.
 
 -debug FILE
 : Append a log of the session to FILE, one JSON object per line: every key

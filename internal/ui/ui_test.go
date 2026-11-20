@@ -1153,3 +1153,57 @@ func TestTheLookupIsLogged(t *testing.T) {
 func tocMsgFor(page string, dir int, next string) tea.Msg {
 	return tocMsg{page: page, dir: dir, res: toc.Result{Found: true, Next: next}}
 }
+
+// mirrorSite serves a Markdown mirror of the HTML site "http://html.example/"
+// with a toc.opml and a bonbon.json, and a page linking into that site.
+func mirrorSiteForUI(t *testing.T) *httptest.Server {
+	t.Helper()
+	var srv *httptest.Server
+	srv = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		md := map[string]string{
+			"/a.md":      "# Alpha\n\n[story](http://html.example/2026/s.html#x) [gone](http://html.example/2026/gone.html) [other](http://elsewhere.example/p.html)\n",
+			"/2026/s.md": "# Story, the Markdown copy\n",
+		}
+		switch r.URL.Path {
+		case "/.well-known/toc.opml":
+			fmt.Fprintf(w, `<opml version="2.0"><body><outline text="a" url="%s/a.md"/></body></opml>`, srv.URL)
+			return
+		case "/.well-known/bonbon.json":
+			fmt.Fprint(w, `{"urlMirrorOf": "http://html.example/"}`)
+			return
+		}
+		body, ok := md[r.URL.Path]
+		if !ok {
+			http.NotFound(w, r)
+			return
+		}
+		w.Header().Set("Content-Type", "text/markdown")
+		fmt.Fprint(w, body)
+	}))
+	t.Cleanup(srv.Close)
+	return srv
+}
+
+func TestALinkIntoAMirroredHTMLSiteOpensTheMarkdownCopy(t *testing.T) {
+	srv := mirrorSiteForUI(t)
+	m := New(srv.URL+"/a.md", render.Glamour{Style: "notty"})
+	m = drive(t, m, m.Init())
+	m = press(t, m, "1", "enter")
+	if out := m.View().Content; !strings.Contains(out, "Story, the Markdown copy") || !strings.Contains(out, srv.URL+"/2026/s.md") {
+		t.Fatalf("after following the link:\n%s", out)
+	}
+}
+
+func TestALinkWhoseMirrorPageIsMissingGoesWhereItPointed(t *testing.T) {
+	srv := mirrorSiteForUI(t)
+	m := New(srv.URL+"/a.md", render.Glamour{Style: "notty"})
+	m = drive(t, m, m.Init())
+	m = press(t, m, "2", "enter")
+	// neither the mirror nor the link target is reachable Markdown, so the original address is what failed
+	if out := m.View().Content; strings.Contains(out, "Story, the Markdown copy") {
+		t.Errorf("opened the wrong page:\n%s", out)
+	}
+	if !strings.Contains(m.status, "html.example") {
+		t.Errorf("status %q should name the address as written", m.status)
+	}
+}

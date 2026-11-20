@@ -128,11 +128,34 @@ func (m Model) load(addr string, idx int, why string) tea.Cmd {
 		return m.openFileAddr(addr, idx, why)
 	}
 	r, width, log := m.r, m.width(), m.log
+	// A followed link into an HTML site that this site mirrors opens the
+	// Markdown copy when it is there, else the link as written (BonBon's rule).
+	var finder *toc.Finder
+	if why == "link" && m.canLookUpTOC() {
+		finder = m.toc
+	}
+	page := ""
+	if m.view != nil {
+		page = m.view.Page.URL
+	}
 	log.Event("load.start", "addr", addr, "idx", idx, "why", why)
 	return func() tea.Msg {
 		t0 := time.Now()
 		ctx, cancel := context.WithTimeout(debuglog.WithContext(context.Background(), log), fetchTimeout)
 		defer cancel()
+		if finder != nil {
+			for _, mir := range finder.Mirrors(ctx, page) {
+				dest := mir.Translate(addr)
+				if dest == "" {
+					continue
+				}
+				if v, err := browse.Open(ctx, dest, r, width); err == nil {
+					log.Event("mirror.follow", "link", addr, "mirror", dest, "ok", true)
+					return loadMsg{v: v, addr: dest, idx: idx, took: time.Since(t0)}
+				}
+				log.Event("mirror.follow", "link", addr, "mirror", dest, "ok", false)
+			}
+		}
 		v, err := browse.Open(ctx, addr, r, width)
 		return loadMsg{v: v, err: err, addr: addr, idx: idx, took: time.Since(t0)}
 	}

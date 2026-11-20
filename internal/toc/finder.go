@@ -35,16 +35,20 @@ type Result struct {
 	Err        error  // reserved for a failure that is not "there is no table of contents"
 }
 
-type fetched struct{ doc *Doc }
+type fetched struct {
+	doc  *Doc
+	incs []string // the include outlines the file named, kept because Splice removes them from doc
+}
 
 /** Finder finds the table of contents that covers a page and remembers what it
  * has fetched, a miss as well as a hit, so the cost of reading a site's table
  * of contents is paid once per site in a session. Make one with NewFinder.
  */
 type Finder struct {
-	client *http.Client
-	mu     sync.Mutex
-	cache  map[string]*fetched
+	client  *http.Client
+	mu      sync.Mutex
+	cache   map[string]*fetched
+	mirrors map[string]string // bonbon.json address to its urlMirrorOf, "" for none
 }
 
 /** NewFinder returns a Finder with its own cache.
@@ -54,7 +58,7 @@ type Finder struct {
  *   r := f.Lookup(ctx, "https://example.org/blog/2026/11/19/a.html")
  */
 func NewFinder() *Finder {
-	return &Finder{client: &http.Client{Timeout: 15 * time.Second}, cache: map[string]*fetched{}}
+	return &Finder{client: &http.Client{Timeout: 15 * time.Second}, cache: map[string]*fetched{}, mirrors: map[string]string{}}
 }
 
 // candidates lists the addresses a table of contents for the page may be at:
@@ -134,6 +138,10 @@ func (f *Finder) get(ctx context.Context, address string, inProgress map[string]
 	defer delete(inProgress, address)
 
 	doc := f.fetch(ctx, address)
+	var incs []string
+	if doc != nil {
+		incs = doc.Includes()
+	}
 	if doc != nil && depth < maxIncludeDepth {
 		base, _ := url.Parse(address)
 		for _, inc := range doc.Includes() {
@@ -147,7 +155,7 @@ func (f *Finder) get(ctx context.Context, address string, inProgress map[string]
 		}
 	}
 	f.mu.Lock()
-	f.cache[address] = &fetched{doc: doc}
+	f.cache[address] = &fetched{doc: doc, incs: incs}
 	f.mu.Unlock()
 	return doc
 }

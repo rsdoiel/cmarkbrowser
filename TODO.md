@@ -38,6 +38,16 @@ https://rsdoiel.github.io/blog/index.md and https://rsdoiel.github.io/antenna/in
 - [ ] glamour renders a table link as `text [N][M]` and adds a reference list under the table with its own numbers, so a page with prose links before a table shows two numbers for each table link (ours is the one that works). Seen on the antenna front page. A reason to move to our own renderer.
 - [ ] Parse in `render.Prepare` with the extensions glamour uses (GFM, DefinitionList) so the two never disagree about what a link is; no failing case found yet.
 
+## Found on Dave's site (2026-11-19)
+
+- [ ] Pages there start with `# {{page.title}}` and `By {{page.author}} on {{page.pubDate}}.` (BonBon draws none of them itself), so cmarkbrowser shows literal braces on a story page such as https://dave.writersweb.org/scripting/2026/11/03/172109.md until it expands `{{page.NAME}}` from the front matter. Macros are not expanded inside code spans or code blocks (author, 2026-11-19: sample code must be able to show them), expansion is one pass with no re-expansion of a value, and nested keys are checked against a running BonBon first.
+- [ ] Those pages give `urlPrev`, `urlNext` and (not in BonBon's list of eight) `urlParent` in front matter; use the first two for previous and next keys.
+- [ ] The Markdown site mirrors an HTML site: `dave.writersweb.org/scripting/.well-known/bonbon.json` has `urlMirrorOf: http://scripting.com/`, `urlSearch` and `urlUpdateSocket`; `/.well-known/toc.opml` at the root has an `include` outline for it. scripting.com itself serves HTML only (no `index.md`, no `.well-known` files).
+
+## Images (2026-11-19)
+
+- [ ] A terminal cannot float or show an image: for a body picture show its alt text as a line (`[image: alt]`, with the address available to follow); for `rightMarginImage` show the alt text from `rightMarginImageAlt` (antennaApp's extension, DR-0009) when there is some and nothing when there is not (the image is treated as decorative). A terminal graphics protocol is later.
+
 ## Browsing
 
 - [ ] Fetch a page with `Accept: text/markdown, text/x-opml`. A page is `text/markdown`, or `text/plain` or a generic binary type with a `.md` or `.markdown` path. HTML and XML show as source; images are not shown at first.

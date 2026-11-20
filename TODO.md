@@ -9,7 +9,7 @@ workspace.
 
 - [x] go.mod (Go 1.27.3), codemeta.json (CodeMeta 3.0), version.go, LICENSE, .gitignore, Makefile (build, test, generate, install, clean).
 - [x] `cmd/cmarkbrowser` over `internal/cli`: `-h`, `-l`, `-v`, usage errors exit 2, tests.
-- [ ] No Charm dependency yet: add bubbletea v2, bubbles v2 and lipgloss v2 plus glamour (versions as in rptop and knowledge for the Charm ones) with the first code that imports them, so `go mod tidy` keeps them.
+- [x] No Charm dependency yet: add bubbletea v2, bubbles v2 and lipgloss v2 plus glamour (versions as in rptop and knowledge for the Charm ones) with the first code that imports them, so `go mod tidy` keeps them. Done: `go.mod` has bubbletea v2, bubbles v2, lipgloss v2 and glamour v2 (checked 2026-11-20).
 
 Not applicable yet, because this is a concept experiment with nothing to release: release.bash and release.ps1, publish scripts, website.mak, page.tmpl, install notes, man pages. Take them from knowledge when a first release is planned.
 
@@ -25,7 +25,7 @@ Not applicable yet, because this is a concept experiment with nothing to release
 - [ ] Autolinks (`<https://...>`) and links whose text is only a code span get no `[N]` marker and, for autolinks, are not collected.
 - [ ] Remove the `internal/render` limits: `Prepare` drops later edits that start inside an earlier removed range; check with a fuzz test.
 - [x] Link focus, option A (2026-11-19): Tab and Shift-Tab move between links, the focused link's marker is shown in reverse video, the window scrolls to keep it in view, the address shows in the status line, Enter follows it; a typed number wins over focus; Tab starts from the first link in the window; it stops at the first and last link. Positions come from a zero-width sentinel (U+2060) before each `[N]` marker (`render.Sentinel`), found by `browse.View.LineOf`; focus state is in `internal/ui`, apart from the finder.
-- [ ] Learn from using A, then decide keys with the author: arrows for focus as in lynx or for scrolling; a links list; `g` to type an address. Known limits: only the marker is highlighted, not the whole link text; a link with no found marker cannot be focused.
+- [ ] Learn from using A, then decide keys with the author: arrows for focus as in lynx or for scrolling; a links list. (Typing an address is `o` since 2026-11-20; `g` still scrolls to the top.) Known limits: only the marker is highlighted, not the whole link text; a link with no found marker cannot be focused.
 - [ ] Decide when to leave glamour (focusable links, layout glamour cannot do, tables) and move to an own renderer over a span-based intermediate form; see the design brief.
 
 ## Found against the live sites (2026-11-19)
@@ -33,7 +33,7 @@ Not applicable yet, because this is a concept experiment with nothing to release
 https://rsdoiel.github.io/blog/index.md and https://rsdoiel.github.io/antenna/index.md already open, as do their post and collection `.md` files (GitHub Pages sends `text/markdown`). `/.well-known/toc.opml` there is 404.
 
 - [x] cmarkbrowser tries the same address first (so a server that negotiates Markdown on `Accept`, as some CDNs do for agents, is respected), then the Markdown copy: `a.html` to `a.md`, a directory to its `index.md` (`page.Fetch`, 2026-11-19; checked on the live blog and antenna sites). Anything else (`.xml`, `.opml`) is not a page.
-- [ ] Every link in those `.md` files points at `.html` (154 of 154 on the blog index; `.html`, `.xml` and `.opml` on the antenna front page), so following one is an error. Two fixes: antennaApp writes `.md` links into its Markdown copies (the real fix), and cmarkbrowser tries the `.md` sibling of a same-site `.html` link first, as BonBon's `urlMirrorOf` does.
+- [x] Every link in those `.md` files points at `.html` (154 of 154 on the blog index; `.html`, `.xml` and `.opml` on the antenna front page), so following one is an error. Two fixes: antennaApp writes `.md` links into its Markdown copies (the real fix), and cmarkbrowser tries the `.md` sibling of a same-site `.html` link first, as BonBon's `urlMirrorOf` does. Resolved 2026-11-20: `page.Fetch` opens the `.md` copy of an `.html` link (checked on the live blog: link 2 of `blog/index.md`, a `.html` address, opens the Markdown post), and local sites do the same (DR-0001). `.xml` and `.opml` targets are still an error line: see the next item.
 - [ ] Following a link to a non-Markdown page: HTML opens in the system browser or says so, XML and OPML show as source text (BonBon's rules), images are noted. Today it is only an error line.
 - [ ] glamour renders a table link as `text [N][M]` and adds a reference list under the table with its own numbers, so a page with prose links before a table shows two numbers for each table link (ours is the one that works). Seen on the antenna front page. A reason to move to our own renderer.
 - [ ] Parse in `render.Prepare` with the extensions glamour uses (GFM, DefinitionList) so the two never disagree about what a link is; no failing case found yet.
@@ -42,7 +42,7 @@ https://rsdoiel.github.io/blog/index.md and https://rsdoiel.github.io/antenna/in
 
 - [x] (2026-11-19) `render.Expand` expands `{{page.KEY}}` from the front matter before `Prepare`: text only (not code spans or blocks), one pass, values escaped, dotted keys reach nested tables (`source.title`), lists join with commas; a missing key (or a table) stays visible and is reported (`-dump` warns on stderr, the TUI shows it in the status line). Checked on https://dave.writersweb.org/scripting/2026/11/03/172109.md. Left: `link` turning the expanded title into a link (antennaApp's extension, DR-0009), and BonBon's own handling of nested keys, not checked against a running BonBon.
 - [x] (2026-11-19) `n` and `p` open the page named by the current page's `urlNext` and `urlPrev` (resolved against its address, a new history entry; a status line says so when the key is absent; ignored while a link number is being typed; the footer hint lists them only when the page has them). `urlParent` is not used yet. Not yet from `/.well-known/toc.opml` when a page has no keys.
-- [ ] The Markdown site mirrors an HTML site: `dave.writersweb.org/scripting/.well-known/bonbon.json` has `urlMirrorOf: http://scripting.com/`, `urlSearch` and `urlUpdateSocket`; `/.well-known/toc.opml` at the root has an `include` outline for it. scripting.com itself serves HTML only (no `index.md`, no `.well-known` files).
+- [x] The Markdown site mirrors an HTML site: `dave.writersweb.org/scripting/.well-known/bonbon.json` has `urlMirrorOf: http://scripting.com/`, `urlSearch` and `urlUpdateSocket`; `/.well-known/toc.opml` at the root has an `include` outline for it. scripting.com itself serves HTML only (no `index.md`, no `.well-known` files). Done as `urlMirrorOf` link translation (`internal/toc/mirror.go`, 2026-11-20); `urlSearch` and `urlUpdateSocket` are server features, see the bonbon.json item.
 
 ## Images (2026-11-19)
 
@@ -73,21 +73,22 @@ https://rsdoiel.github.io/blog/index.md and https://rsdoiel.github.io/antenna/in
 
 ## Browsing
 
-- [ ] Fetch a page with `Accept: text/markdown, text/x-opml`. A page is `text/markdown`, or `text/plain` or a generic binary type with a `.md` or `.markdown` path. HTML and XML show as source; images are not shown at first.
-- [ ] Parse front matter (`title`, `description`, `author`, `pubDate`, `link`, `urlPrev`, `urlNext`, `rightMarginImage`) and strip it before display.
-- [ ] Render Markdown to the terminal with glamour first (author, 2026-11-19). Switch to goldmark's AST with our own renderer only if glamour proves too constrained. Check early what glamour does with raw HTML, since BonBon strips it, and whether links can be numbered or focused.
-- [ ] Scrolling viewport, numbered or focusable links, follow a link, back and forward, history.
+- [x] Fetch a page with `Accept: text/markdown, text/x-opml`. A page is `text/markdown`, or `text/plain` or a generic binary type with a `.md` or `.markdown` path. HTML and XML show as source; images are not shown at first. Done: `page.Fetch` (see Spike, Found against the live sites, Declared alternate). Images and non-Markdown links: see the open items under Images and Reader view.
+- [x] Parse front matter (`title`, `description`, `author`, `pubDate`, `link`, `urlPrev`, `urlNext`, `rightMarginImage`) and strip it before display. Done: `page.Parse`; `render.Expand` for `{{page.KEY}}`.
+- [x] Render Markdown to the terminal with glamour first (author, 2026-11-19). Switch to goldmark's AST with our own renderer only if glamour proves too constrained. Check early what glamour does with raw HTML, since BonBon strips it, and whether links can be numbered or focused. Done: glamour, with `render.Prepare` stripping HTML and numbering links; findings under Spike. The decision to leave glamour stays open (Spike).
+- [x] Scrolling viewport, numbered or focusable links, follow a link, back and forward, history. Done: viewport, numbered and Tab-focused links, `b`/`f`, `o`, `H`.
 - [x] (2026-11-19) Read the site's table of contents for previous and next (`internal/toc`). `]` and `[` use the page's own `urlNext` and `urlPrev` and, when it names none, ask the table of contents: the nearest `.well-known/toc.opml` above the page (up to 6 folders, nearest first, the first that lists the page wins), with its same-host `include` outlines merged (depth 3, 12 fetches, loops cut), each file capped at 8 MB. Read the first time a key needs it, never when a page loads; hits and misses are remembered for the session. antennaApp's rule (DR-0013 5): only pages count (a url with nothing under it; a month outline that is itself a page is an index); a plain group such as Pages or Posts is a list of its own; calendar outlines inside a list are newest first (previous is the line below) unless the numbers in their `name` attributes rise, which is how antenna writes since the 2026-11-19 amendment to its DR-0013 (BonBon reads previous as the line above); with one year and one month there is nothing to compare and newest first is assumed; elsewhere previous is the line above. It reads ISO-8859-1 and windows-1252 itself, so Dave Winer's real file works (the `opml` module still cannot: its TODO). Not used for reader views or local files; an answer that arrives after the person moved on is dropped. Events `toc.fetch` and `toc.lookup` in the debug log. Checked on the live blog (`]` newer, `[` older through 2022-11-17 to 2022-11-28) and on Dave's file: for 38 of 38 sampled pages the outline's previous is older and brackets his explicit `urlPrev`, and its next is newer and brackets his explicit `urlNext` (his outline has one entry per day and his keys link to adjacent posts, so exact addresses differ when he posts twice a day). Own parser, with no `opml` dependency, until the module has `Flatten` and `Includes` and reads other encodings.
 - [x] (2026-11-20) The site root's `/.well-known/toc.opml` is asked first, as BonBon asks it, and a root that lists the page ends the lookup: a page in a folder not seen before costs no request. Folders nearer the page (up to 6 addresses in all) are tried, nearest first, only when the root does not list the page, so a nested site with its own table of contents still works. Change from the first version, where the nearest folder won when both listed the page. Misses stay remembered per address.
 - [ ] Collections in an antenna table of contents are a list of their own, so `]` steps between them; antenna's HTML gives collections no arrows (DR-0013 5).
-- [ ] Read `/.well-known/bonbon.json` (`urlSearch`, `urlMirrorOf`, `cname`, `urlUpdateSocket`); search by `?q=`.
-- [ ] Exit codes per DR-0003: unreachable server 69, bad Markdown or OPML 65, missing page 66.
+- [x] (2026-11-20) Read `/.well-known/bonbon.json` for `urlMirrorOf` (see the mirror item above). BonBon ignores `cname`; antenna writes no `bonbon.json` (antennaApp DR-0014).
+- [ ] `urlSearch` from `bonbon.json`: search a site that has a search server (Dave's has one), BonBon appends `?q=` and the word and expects a Markdown results page; a key such as `s` would ask for the query. `urlUpdateSocket` (a websocket watcher) is not planned.
+- [x] Exit codes per DR-0003: unreachable server 69, bad Markdown or OPML 65, missing page 66. Done: 2, 65, 66, 69, 70, 73, 77; tested in `internal/cli`, documented under EXIT STATUS in the help.
 
 ## Open questions
 
-- [ ] Is a bookmarks file wanted, and where does it live? (No global settings files in the workspace; configuration may have to be a file in the working directory.)
+- [x] Is a bookmarks file wanted, and where does it live? (No global settings files in the workspace; configuration may have to be a file in the working directory.) Answered: yes, `bookmarks.md` in the launch directory (`m`, `B`, `-bookmarks`); where it lives long term is the config-file item under Someday.
 - [ ] Images: show nothing, show alt text, or use a terminal graphics protocol later.
-- [ ] Should it be a TUI only, or also print a rendered page to standard output for use in pipes (`cmarkbrowser -dump URL`)?
+- [x] Should it be a TUI only, or also print a rendered page to standard output for use in pipes (`cmarkbrowser -dump URL`)? Answered: both. `-dump` prints the rendered page and its links.
 
 ## Someday, Maybe features
 

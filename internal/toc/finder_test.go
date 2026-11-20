@@ -52,7 +52,7 @@ func opmlWith(entries ...string) string {
 
 func entry(url string) string { return `<outline text="e" url="` + url + `"/>` }
 
-func TestTheNearestTableOfContentsAboveThePageIsFoundAndMissesAreRemembered(t *testing.T) {
+func TestTheRootTableOfContentsIsAskedFirstAndNearerFoldersAreNotProbedWhenItListsThePage(t *testing.T) {
 	site := newTOCSite(t, map[string]string{
 		"/.well-known/toc.opml": opmlWith(entry("{base}/blog/2026/a.md"), entry("{base}/blog/2026/b.md"), entry("{base}/blog/2026/c.md")),
 	})
@@ -64,24 +64,58 @@ func TestTheNearestTableOfContentsAboveThePageIsFoundAndMissesAreRemembered(t *t
 	if r.TOC != site.URL+"/.well-known/toc.opml" {
 		t.Errorf("toc %q", r.TOC)
 	}
-	// every folder above the page was probed, once
-	for _, p := range []string{"/blog/2026/.well-known/toc.opml", "/blog/.well-known/toc.opml", "/.well-known/toc.opml"} {
+	// BonBon asks the origin root once; folders nearer the page are not asked
+	if site.count("/.well-known/toc.opml") != 1 {
+		t.Errorf("root fetched %d times, want 1", site.count("/.well-known/toc.opml"))
+	}
+	for _, p := range []string{"/blog/2026/.well-known/toc.opml", "/blog/.well-known/toc.opml"} {
+		if site.count(p) != 0 {
+			t.Errorf("%s fetched %d times, want 0", p, site.count(p))
+		}
+	}
+	// a page in a folder not seen before costs nothing either
+	r = f.Lookup(context.Background(), site.URL+"/blog/2027/c.html")
+	if r.Found {
+		t.Errorf("unlisted page found: %+v", r)
+	}
+	f.Lookup(context.Background(), site.URL+"/blog/2026/c.html")
+	if site.count("/.well-known/toc.opml") != 1 {
+		t.Errorf("root fetched %d times after more lookups", site.count("/.well-known/toc.opml"))
+	}
+}
+
+func TestMissesAreRememberedWhenNoRootListsThePage(t *testing.T) {
+	site := newTOCSite(t, map[string]string{
+		"/blog/.well-known/toc.opml": opmlWith(entry("{base}/blog/2026/a.md"), entry("{base}/blog/2026/b.md")),
+	})
+	f := NewFinder()
+	for i := 0; i < 2; i++ {
+		r := f.Lookup(context.Background(), site.URL+"/blog/2026/a.html")
+		if !r.Found || r.Next != site.URL+"/blog/2026/b.md" {
+			t.Fatalf("result %+v", r)
+		}
+	}
+	for _, p := range []string{"/.well-known/toc.opml", "/blog/2026/.well-known/toc.opml", "/blog/.well-known/toc.opml"} {
 		if site.count(p) != 1 {
 			t.Errorf("%s fetched %d times, want 1", p, site.count(p))
 		}
 	}
-	// the next question about the same site costs nothing: hits and misses are remembered
-	f.Lookup(context.Background(), site.URL+"/blog/2026/c.html")
-	for _, p := range []string{"/blog/2026/.well-known/toc.opml", "/blog/.well-known/toc.opml", "/.well-known/toc.opml"} {
-		if site.count(p) != 1 {
-			t.Errorf("after a second lookup %s was fetched %d times", p, site.count(p))
-		}
+}
+
+func TestTheRootWinsOverADeeperTableOfContentsWhenBothListThePage(t *testing.T) {
+	site := newTOCSite(t, map[string]string{
+		"/.well-known/toc.opml":   opmlWith(entry("{base}/s/a.md"), entry("{base}/s/b.md")),
+		"/s/.well-known/toc.opml": opmlWith(entry("{base}/s/x.md"), entry("{base}/s/a.md"), entry("{base}/s/y.md")),
+	})
+	r := NewFinder().Lookup(context.Background(), site.URL+"/s/a.md")
+	if r.TOC != site.URL+"/.well-known/toc.opml" || r.Next != site.URL+"/s/b.md" {
+		t.Errorf("%+v", r)
 	}
 }
 
-func TestADeeperTableOfContentsWinsWhenItListsThePage(t *testing.T) {
+func TestADeeperTableOfContentsIsUsedWhenTheRootDoesNotListThePage(t *testing.T) {
 	site := newTOCSite(t, map[string]string{
-		"/.well-known/toc.opml":   opmlWith(entry("{base}/s/a.md"), entry("{base}/s/b.md")),
+		"/.well-known/toc.opml":   opmlWith(entry("{base}/other.md")),
 		"/s/.well-known/toc.opml": opmlWith(entry("{base}/s/x.md"), entry("{base}/s/a.md"), entry("{base}/s/y.md")),
 	})
 	r := NewFinder().Lookup(context.Background(), site.URL+"/s/a.md")
@@ -189,5 +223,12 @@ func TestAHugeFileIsRefused(t *testing.T) {
 	big := newTOCSite(t, map[string]string{"/.well-known/toc.opml": opmlWith(strings.Repeat(entry("http://x.example/p.md"), 400000))})
 	if r := NewFinder().Lookup(context.Background(), big.URL+"/p.md"); r.Found {
 		t.Error("a file over the size cap was read")
+	}
+}
+
+func TestTheRootIsAlwaysProbedEvenForAVeryDeepPage(t *testing.T) {
+	c := candidates("http://h.example/a/b/c/d/e/f/g/h/page.md")
+	if len(c) != maxProbes || c[0] != "http://h.example/.well-known/toc.opml" || c[1] != "http://h.example/a/b/c/d/e/f/g/h/.well-known/toc.opml" {
+		t.Errorf("%v", c)
 	}
 }

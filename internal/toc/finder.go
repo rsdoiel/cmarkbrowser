@@ -57,24 +57,22 @@ func NewFinder() *Finder {
 	return &Finder{client: &http.Client{Timeout: 15 * time.Second}, cache: map[string]*fetched{}}
 }
 
-// candidates lists the addresses a table of contents for the page may be at,
-// nearest folder first: <folder>/.well-known/toc.opml for each folder from the
-// page's up to the site root, at most maxProbes of them.
+// candidates lists the addresses a table of contents for the page may be at:
+// the site root first, as BonBon asks it and nothing nearer, then
+// <folder>/.well-known/toc.opml for each folder from the page's up to, but not
+// including, the root, nearest first, at most maxProbes addresses in all. A
+// root that lists the page ends the lookup, so a page in a folder not seen
+// before costs no request once the root's answer is remembered.
 func candidates(page string) []string {
 	u, err := url.Parse(page)
 	if err != nil || (u.Scheme != "http" && u.Scheme != "https") || u.Host == "" {
 		return nil
 	}
+	base := u.Scheme + "://" + u.Host
+	out := []string{base + "/.well-known/toc.opml"}
 	dir := path.Dir(u.Path)
-	if u.Path == "" {
-		dir = "/"
-	}
-	var out []string
-	for len(out) < maxProbes {
-		out = append(out, u.Scheme+"://"+u.Host+strings.TrimRight(dir, "/")+"/.well-known/toc.opml")
-		if dir == "/" || dir == "." || dir == "" {
-			break
-		}
+	for dir != "/" && dir != "." && dir != "" && len(out) < maxProbes {
+		out = append(out, base+strings.TrimRight(dir, "/")+"/.well-known/toc.opml")
 		dir = path.Dir(dir)
 	}
 	return out
@@ -82,8 +80,8 @@ func candidates(page string) []string {
 
 /** Lookup finds the table of contents that lists page and returns the pages
  * before and after it (see the package comment for the rule). It tries the
- * folders above the page, nearest first, takes the first table of contents
- * that lists the page, and merges the outlines it includes from the same host.
+ * site root first, then the folders above the page, nearest first, and takes
+ * the first table of contents that lists the page, and merges the outlines it includes from the same host.
  * A site with no table of contents, a file that is not an outline, a page that
  * is not listed: all give Found false, not an error.
  *

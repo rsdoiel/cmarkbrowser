@@ -3,7 +3,6 @@ package render
 import (
 	"fmt"
 	"regexp"
-	"sort"
 	"strings"
 
 	"github.com/yuin/goldmark"
@@ -85,12 +84,7 @@ func Expand(src string, meta map[string]any) (string, []string) {
 		return ast.WalkContinue, nil
 	})
 
-	sort.SliceStable(edits, func(i, j int) bool { return edits[i].start > edits[j].start })
-	out := b
-	for _, e := range edits {
-		out = append(append(append([]byte{}, out[:e.start]...), e.repl...), out[e.stop:]...)
-	}
-	return string(out), missing
+	return applyEdits(b, edits), missing
 }
 
 // lookupMeta finds a dotted key in front matter and returns its text. ok is

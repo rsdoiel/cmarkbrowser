@@ -13,6 +13,20 @@ workspace.
 
 Not applicable yet, because this is a concept experiment with nothing to release: release.bash and release.ps1, publish scripts, website.mak, page.tmpl, install notes, man pages. Take them from knowledge when a first release is planned.
 
+## Spike (2026-11-19)
+
+- [x] `internal/page`: fetch with `Accept: text/markdown, text/x-opml`, BonBon's page rule, front matter, size cap; errors wrap sentinels for exits 65, 66, 69.
+- [x] `internal/render`: `Renderer` interface, glamour implementation, and `Prepare` (goldmark: strips HTML including script and style content, leaves code alone, numbers links ` [N]`, collects them).
+- [x] `internal/browse`: fetch, prepare, render, resolve links against the page address, re-render on resize.
+- [x] `internal/ui`: bubbletea viewport, follow a link by number, back and forward, status line, resize. Tested with synthetic messages; smoke-tested in a pty against https://dave.writersweb.org/ (open, follow link 1, back, quit; exit 0).
+- [x] `-dump`, `-style`, `-width`.
+- Findings: glamour keeps the text inside `<script>` (hence `Prepare`); it prints each link's URL after the link text, which duplicates our `[N]` and wraps badly for long URLs; it cannot report where a link landed, so links are followed by number, not focus.
+- [ ] Try a custom glamour style that hides the URL after link text.
+- [ ] Autolinks (`<https://...>`) and links whose text is only a code span get no `[N]` marker and, for autolinks, are not collected.
+- [ ] Remove the `internal/render` limits: `Prepare` drops later edits that start inside an earlier removed range; check with a fuzz test.
+- [ ] Link focus, as in elinks, lynx and ncgopher: move between links (Tab and Shift-Tab, maybe Up and Down), highlight the focused link, scroll to keep it in view, Enter follows it; number then Enter stays. First by searching the rendered text for the `[N]` markers (design brief, option A); keep focus state apart from how positions are found. Make the marker a form that page text cannot contain.
+- [ ] Decide when to leave glamour (focusable links, layout glamour cannot do, tables) and move to an own renderer over a span-based intermediate form; see the design brief.
+
 ## Browsing
 
 - [ ] Fetch a page with `Accept: text/markdown, text/x-opml`. A page is `text/markdown`, or `text/plain` or a generic binary type with a `.md` or `.markdown` path. HTML and XML show as source; images are not shown at first.

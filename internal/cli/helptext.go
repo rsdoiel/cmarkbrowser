@@ -19,6 +19,8 @@ const HelpText = `%{app_name}(1) user manual | version {version} {release_hash}
 
 {app_name} [OPTIONS] [URL]
 
+{app_name} -dump [-style NAME] [-width N] URL
+
 # DESCRIPTION
 
 {app_name} fetches a page as Markdown, shows it in the terminal and follows
@@ -26,7 +28,8 @@ its links. It is modelled on Dave Winer's BonBon: HTML in a page is stripped,
 a page cannot carry its own styling, and a site's table of contents is read
 from /.well-known/toc.opml.
 
-This is a scaffold: only the options below work. Browsing is not built yet.
+In the browser, type a link's number and press Enter to follow it; b and f
+go back and forward; arrows, PgUp, PgDn, space, g and G scroll; q quits.
 
 # OPTIONS
 
@@ -35,6 +38,15 @@ This is a scaffold: only the options below work. Browsing is not built yet.
 
 -l, -license
 : Show the license.
+
+-dump
+: Fetch the URL, print the rendered page and its numbered links, and exit.
+
+-style NAME
+: glamour style for -dump: dark (default), light, notty, ascii.
+
+-width N
+: Columns to wrap to (default 80).
 
 -v, -version
 : Show the version.
@@ -47,6 +59,15 @@ This is a scaffold: only the options below work. Browsing is not built yet.
 2
 : Bad command line.
 
+65
+: The page is not Markdown, or its front matter is not valid.
+
+66
+: The page is not there (404 or 410).
+
+69
+: The server cannot be reached.
+
 70
-: A bug, or a request for something not built yet.
+: A bug.
 `

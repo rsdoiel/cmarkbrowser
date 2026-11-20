@@ -38,7 +38,7 @@
   "version": "0.0.0",
   "developmentStatus": "concept",
   "issueTracker": "https://github.com/rsdoiel/cmarkbrowser/issues",
-  "releaseNotes": "Not released. Scaffold only: the command line (-h, -l, -v) and the exit codes; no browsing yet.",
+  "releaseNotes": "Not released. Not released. A spike: fetch, strip front matter and HTML, render with glamour, follow numbered links, back and forward.",
   "copyrightYear": 2026,
   "copyrightHolder": "R. S. Doiel"
 }

@@ -15,8 +15,12 @@ sized reader for the same pages, and a way to test what
 
 ## Status
 
-Scaffold only: `-h`, `-l`, `-v` and the exit codes work. See TODO.md for the
-plan and the questions that remain open.
+A working spike. `cmarkbrowser URL` opens a page in a terminal viewer; type a
+link's number and press Enter to follow it, `b` and `f` go back and forward,
+`q` quits. `cmarkbrowser -dump URL` prints the rendered page and its links.
+Pages are fetched with BonBon's `Accept` header, front matter and HTML are
+stripped, and Markdown is rendered with glamour. No `toc.opml`, search or
+local-directory sites yet; see TODO.md.
 
 ### Authors
 

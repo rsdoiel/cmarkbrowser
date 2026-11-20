@@ -15,6 +15,7 @@ import (
 	"strings"
 	"time"
 
+	"golang.org/x/net/html"
 	"gopkg.in/yaml.v3"
 )
 
@@ -34,7 +35,11 @@ var errNotMarkdown = errors.New("not Markdown")
 
 // notMarkdown is the error for a good response that is not a page. It reads as
 // one message, is an ErrData, and is also errNotMarkdown.
-type notMarkdown struct{ msg string }
+type notMarkdown struct {
+	msg  string
+	head []byte // the start of an HTML answer, to look for a declared alternate
+	base string // the address that answered, for resolving that alternate
+}
 
 func (e *notMarkdown) Error() string        { return e.msg }
 func (e *notMarkdown) Is(target error) bool { return target == errNotMarkdown }
@@ -42,6 +47,10 @@ func (e *notMarkdown) Unwrap() error        { return ErrData }
 
 // Accept is the Accept header BonBon sends with every page request.
 const Accept = "text/markdown, text/x-opml"
+
+// maxHead is how much of an HTML page is read to find a declared alternate. A
+// head is small; the page itself may be many megabytes and is never loaded.
+const maxHead = 128 << 10
 
 // maxBody caps what Fetch reads, so a hostile or broken server cannot fill memory.
 const maxBody = 8 << 20
@@ -197,6 +206,17 @@ func Fetch(ctx context.Context, rawurl string) (*Page, error) {
 	if err == nil || !errors.Is(err, errNotMarkdown) {
 		return p, err
 	}
+	// The page may say where its Markdown is. That beats guessing the .md
+	// sibling: for an antenna collection the sibling is the author's feed list,
+	// and the news is on the page the HTML declares.
+	var nm *notMarkdown
+	if errors.As(err, &nm) && len(nm.head) > 0 {
+		if alt := declaredAlternate(nm.base, nm.head); alt != "" && alt != rawurl {
+			if p, err2 := fetchOne(ctx, alt); err2 == nil {
+				return p, nil
+			}
+		}
+	}
 	sib := markdownSibling(rawurl)
 	if sib == "" {
 		return nil, err
@@ -253,7 +273,12 @@ func fetchOne(ctx context.Context, rawurl string) (*Page, error) {
 		return nil, fmt.Errorf("%w: %s: %s", ErrData, rawurl, resp.Status)
 	}
 	if !IsMarkdown(resp.Header.Get("Content-Type"), resp.Request.URL.Path) {
-		return nil, &notMarkdown{fmt.Sprintf("%s: %s is not Markdown (%s)", ErrData, rawurl, resp.Header.Get("Content-Type"))}
+		nm := &notMarkdown{msg: fmt.Sprintf("%s: %s is not Markdown (%s)", ErrData, rawurl, resp.Header.Get("Content-Type")), base: resp.Request.URL.String()}
+		// Keep the start of an HTML page: its head may declare a Markdown alternate.
+		if mt, _, _ := mime.ParseMediaType(resp.Header.Get("Content-Type")); mt == "text/html" || mt == "application/xhtml+xml" {
+			nm.head, _ = io.ReadAll(io.LimitReader(resp.Body, maxHead))
+		}
+		return nil, nm
 	}
 	body, err := io.ReadAll(io.LimitReader(resp.Body, maxBody+1))
 	if err != nil {
@@ -268,4 +293,92 @@ func fetchOne(ctx context.Context, rawurl string) (*Page, error) {
 	}
 	p.URL = resp.Request.URL.String()
 	return p, nil
+}
+
+/** declaredAlternate returns the address of the Markdown page that an HTML
+ * page declares in its head, as <link rel="alternate" type="text/markdown"
+ * href="...">, resolved against the page's own address (antennaApp DR-0008
+ * writes one on every collection page). rel may hold several words and type
+ * may carry parameters; both are compared without case. A link in the body
+ * does not count, nor does application/markdown or an alternate stylesheet,
+ * nor an address on another host: a page is not allowed to send the reader elsewhere.
+ *
+ * Parameters:
+ *   base (string) — the address that served the HTML
+ *   head ([]byte) — the start of the HTML
+ *
+ * Returns:
+ *   string — the absolute address, or "" when there is no usable declaration
+ *
+ * Example:
+ *   alt := declaredAlternate("https://x.org/food.html", head) // "https://x.org/food_items.md"
+ */
+func declaredAlternate(base string, head []byte) string {
+	b, err := url.Parse(base)
+	if err != nil {
+		return ""
+	}
+	z := html.NewTokenizer(bytes.NewReader(head))
+	for {
+		switch z.Next() {
+		case html.ErrorToken:
+			return ""
+		case html.EndTagToken:
+			if name, _ := z.TagName(); string(name) == "head" {
+				return ""
+			}
+		case html.StartTagToken, html.SelfClosingTagToken:
+			name, hasAttr := z.TagName()
+			switch string(name) {
+			case "body":
+				return "" // the head is over
+			case "link":
+				if !hasAttr {
+					continue
+				}
+				var rel, typ, href string
+				for {
+					key, val, more := z.TagAttr()
+					switch string(key) {
+					case "rel":
+						rel = string(val)
+					case "type":
+						typ = string(val)
+					case "href":
+						href = string(val)
+					}
+					if !more {
+						break
+					}
+				}
+				// "alternate stylesheet" is an alternate style, not an alternate page.
+				if !hasWord(rel, "alternate") || hasWord(rel, "stylesheet") || href == "" {
+					continue
+				}
+				if mt, _, err := mime.ParseMediaType(typ); err != nil || mt != "text/markdown" {
+					continue
+				}
+				ref, err := url.Parse(strings.TrimSpace(href))
+				if err != nil {
+					continue
+				}
+				abs := b.ResolveReference(ref)
+				if (abs.Scheme != "http" && abs.Scheme != "https") || abs.Host != b.Host {
+					continue
+				}
+				abs.Fragment = ""
+				return abs.String()
+			}
+		}
+	}
+}
+
+// hasWord reports whether the space-separated list has word, ignoring case.
+func hasWord(list, word string) bool {
+	for _, w := range strings.Fields(list) {
+		if strings.EqualFold(w, word) {
+			return true
+		}
+	}
+	return false
 }

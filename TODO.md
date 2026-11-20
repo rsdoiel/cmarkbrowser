@@ -48,6 +48,11 @@ https://rsdoiel.github.io/blog/index.md and https://rsdoiel.github.io/antenna/in
 
 - [ ] A terminal cannot float or show an image: for a body picture show its alt text as a line (`[image: alt]`, with the address available to follow); for `rightMarginImage` show the alt text from `rightMarginImageAlt` (antennaApp's extension, DR-0009) when there is some and nothing when there is not (the image is treated as decorative). A terminal graphics protocol is later.
 
+## Declared alternate (2026-11-19)
+
+- [x] When an address answers HTML, `page.Fetch` reads the first 128 KB, finds `<link rel="alternate" type="text/markdown" href>` in the head and fetches that before guessing the `.md` sibling (order: same address, declared alternate, sibling). Same host only; `application/markdown`, a link in the body and an alternate stylesheet do not count; a missing alternate falls back to the sibling. Checked on a copy of the antenna site: `food.html` now opens `food_items.md` (the news), where the sibling `food.md` is the author's feed list.
+- [ ] Slow on a large collection: `pacific_items.md` (4.5 MB, 96,000 rendered lines) takes about 20 s to open under `-dump`, nearly all of it in glamour. Needs a measurement (`-debug` timings would show it) and probably an own renderer or paging.
+
 ## Browsing
 
 - [ ] Fetch a page with `Accept: text/markdown, text/x-opml`. A page is `text/markdown`, or `text/plain` or a generic binary type with a `.md` or `.markdown` path. HTML and XML show as source; images are not shown at first.

@@ -94,7 +94,7 @@ func runDump(addr string, r render.Renderer, width int, stdout, stderr io.Writer
 	if err != nil {
 		return fail(stderr, err)
 	}
-	fmt.Fprint(stdout, v.Text)
+	fmt.Fprint(stdout, v.Display(-1))
 	if len(v.Links) > 0 {
 		fmt.Fprintln(stdout, "\nLinks:")
 		for _, l := range v.Links {

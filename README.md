@@ -15,9 +15,9 @@ sized reader for the same pages, and a way to test what
 
 ## Status
 
-A working spike. `cmarkbrowser URL` opens a page in a terminal viewer; type a
-link's number and press Enter to follow it, `b` and `f` go back and forward,
-`q` quits. `cmarkbrowser -dump URL` prints the rendered page and its links.
+A working spike. `cmarkbrowser URL` opens a page in a terminal viewer. Tab and
+Shift-Tab move between links and Enter follows the focused one; or type a
+link's number and press Enter. `b` and `f` go back and forward, `q` quits. `cmarkbrowser -dump URL` prints the rendered page and its links.
 Pages are fetched with BonBon's `Accept` header, front matter and HTML are
 stripped, and Markdown is rendered with glamour. No `toc.opml`, search or
 local-directory sites yet; see TODO.md.

@@ -5,6 +5,9 @@ import (
 	"context"
 	"fmt"
 	"net/url"
+	"regexp"
+	"strconv"
+	"strings"
 
 	"github.com/rsdoiel/cmarkbrowser/internal/page"
 	"github.com/rsdoiel/cmarkbrowser/internal/render"
@@ -28,7 +31,8 @@ type Link struct {
  * Fields:
  *   Page (*page.Page) — the fetched page
  *   Clean (string) — the body after HTML was stripped and links numbered
- *   Text (string) — the rendered, styled text
+ *   Text (string) — the rendered, styled text, with a Sentinel before each
+ *     link marker; use Display to get text fit to show
  *   Links ([]Link) — the numbered links, in reading order
  */
 type View struct {
@@ -36,6 +40,8 @@ type View struct {
 	Clean string
 	Text  string
 	Links []Link
+
+	lines map[int]int // link number -> line of its marker in Text
 }
 
 /** Resolve resolves a link destination against the address of the page it is on.
@@ -89,6 +95,7 @@ func Open(ctx context.Context, addr string, r render.Renderer, width int) (*View
 		return nil, fmt.Errorf("rendering %s: %w", addr, err)
 	}
 	v := &View{Page: p, Clean: clean, Text: text}
+	v.index()
 	for _, l := range links {
 		// A link that cannot be resolved stays in the text but is not followable.
 		u, err := Resolve(p.URL, l.Dest)
@@ -119,5 +126,63 @@ func (v *View) Rerender(r render.Renderer, width int) error {
 		return fmt.Errorf("rendering %s: %w", v.Page.URL, err)
 	}
 	v.Text = text
+	v.index()
 	return nil
+}
+
+// markerRE matches a link marker in rendered text: the sentinel, optionally
+// with styling codes between it and the bracket, then [N].
+var markerRE = regexp.MustCompile(render.Sentinel + `((?:\x1b\[[0-9;]*m)*)\[(\d+)\]`)
+
+// index finds the line of each link marker in Text.
+func (v *View) index() {
+	v.lines = map[int]int{}
+	for i, line := range strings.Split(v.Text, "\n") {
+		for _, m := range markerRE.FindAllStringSubmatch(line, -1) {
+			if n, err := strconv.Atoi(m[2]); err == nil {
+				if _, seen := v.lines[n]; !seen {
+					v.lines[n] = i
+				}
+			}
+		}
+	}
+}
+
+/** LineOf returns the line of Display's output where a link's marker is.
+ *
+ * Parameters:
+ *   n (int) — the link number
+ *
+ * Returns:
+ *   int — the zero-based line
+ *   bool — false when the marker was not found in the rendered text
+ *
+ * Example:
+ *   line, ok := v.LineOf(2)
+ */
+func (v *View) LineOf(n int) (int, bool) {
+	l, ok := v.lines[n]
+	return l, ok
+}
+
+/** Display returns the rendered text ready to show: sentinels removed and the
+ * marker of the focused link in reverse video.
+ *
+ * Parameters:
+ *   focus (int) — the number of the focused link, or a value below 1 for none
+ *
+ * Returns:
+ *   string — the text
+ *
+ * Example:
+ *   viewport.SetContent(v.Display(3))
+ */
+func (v *View) Display(focus int) string {
+	return markerRE.ReplaceAllStringFunc(v.Text, func(m string) string {
+		sub := markerRE.FindStringSubmatch(m)
+		if n, _ := strconv.Atoi(sub[2]); n == focus {
+			return sub[1] + "\x1b[7m[" + sub[2] + "]\x1b[27m"
+		}
+		return sub[1] + "[" + sub[2] + "]"
+	})
 }

@@ -28,8 +28,10 @@ its links. It is modelled on Dave Winer's BonBon: HTML in a page is stripped,
 a page cannot carry its own styling, and a site's table of contents is read
 from /.well-known/toc.opml.
 
-In the browser, type a link's number and press Enter to follow it; b and f
-go back and forward; arrows, PgUp, PgDn, space, g and G scroll; q quits.
+In the browser, Tab and Shift-Tab move between links (the focused link's
+address is shown at the bottom) and Enter follows it. Or type a link's number
+and press Enter. b and f go back and forward; Esc clears a typed number or the
+focus; arrows, PgUp, PgDn, space, g and G scroll; q quits.
 
 # OPTIONS
 

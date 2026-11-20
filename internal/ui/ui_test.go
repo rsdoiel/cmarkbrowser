@@ -176,3 +176,118 @@ func TestQuit(t *testing.T) {
 		t.Error("q did not quit")
 	}
 }
+
+// longSite serves /long.md with many lines between two links.
+func longSite(t *testing.T) *httptest.Server {
+	t.Helper()
+	body := "# Top\n\n[first](a.md)\n\n" + strings.Repeat("filler paragraph\n\n", 60) + "[far](b.md)\n\n[last](c.md)\n"
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/markdown")
+		if r.URL.Path == "/long.md" {
+			fmt.Fprint(w, body)
+			return
+		}
+		fmt.Fprintf(w, "# Visited %s\n", r.URL.Path)
+	}))
+	t.Cleanup(srv.Close)
+	return srv
+}
+
+func openLong(t *testing.T) Model {
+	t.Helper()
+	srv := longSite(t)
+	m := New(srv.URL+"/long.md", render.Glamour{Style: "notty"})
+	m = drive(t, m, m.Init())
+	next, _ := m.Update(tea.WindowSizeMsg{Width: 80, Height: 12})
+	return next.(Model)
+}
+
+func TestTabFocusesFirstLinkAndHighlightsIt(t *testing.T) {
+	m, _ := open(t)
+	m = press(t, m, "tab")
+	if m.focus != 1 {
+		t.Fatalf("focus %d", m.focus)
+	}
+	if out := m.View().Content; !strings.Contains(out, "\x1b[7m[1]\x1b[27m") {
+		t.Errorf("no highlight:\n%q", out)
+	}
+	m = press(t, m, "tab")
+	if m.focus != 2 || strings.Contains(m.View().Content, "\x1b[7m[1]") {
+		t.Errorf("focus %d, still highlighted 1", m.focus)
+	}
+}
+
+func TestShiftTabMovesBackAndStopsAtTheFirstLink(t *testing.T) {
+	m, _ := open(t)
+	m = press(t, m, "tab", "tab", "shift+tab")
+	if m.focus != 1 {
+		t.Errorf("focus %d", m.focus)
+	}
+	m = press(t, m, "shift+tab")
+	if m.focus != 1 || !strings.Contains(m.status, "first link") {
+		t.Errorf("focus %d, status %q", m.focus, m.status)
+	}
+}
+
+func TestTabStopsAtTheLastLink(t *testing.T) {
+	m, _ := open(t)
+	m = press(t, m, "tab", "tab", "tab")
+	if m.focus != 2 || !strings.Contains(m.status, "last link") {
+		t.Errorf("focus %d, status %q", m.focus, m.status)
+	}
+}
+
+func TestEnterFollowsTheFocusedLink(t *testing.T) {
+	m, _ := open(t)
+	m = press(t, m, "tab", "tab", "enter")
+	if out := m.View().Content; !strings.Contains(out, "Gamma") {
+		t.Errorf("did not follow link 2:\n%s", out)
+	}
+	if m.focus != 0 {
+		t.Errorf("focus %d after loading a page", m.focus)
+	}
+}
+
+func TestTypedNumberWinsOverFocusOnEnter(t *testing.T) {
+	m, _ := open(t)
+	m = press(t, m, "tab", "2", "enter")
+	if !strings.Contains(m.View().Content, "Gamma") {
+		t.Errorf("typed 2 was not followed:\n%s", m.View().Content)
+	}
+}
+
+func TestFocusScrollsTheLinkIntoView(t *testing.T) {
+	m := openLong(t)
+	m = press(t, m, "tab", "tab")
+	line, ok := m.view.LineOf(2)
+	if !ok {
+		t.Fatal("link 2 not found")
+	}
+	top := m.vp.YOffset()
+	if line < top || line >= top+m.vp.Height() {
+		t.Errorf("link line %d outside the window %d..%d", line, top, top+m.vp.Height())
+	}
+	if !strings.Contains(m.View().Content, "\x1b[7m[2]") {
+		t.Error("focused link not on screen")
+	}
+}
+
+func TestTabStartsFromTheTopOfTheWindowAfterScrolling(t *testing.T) {
+	m := openLong(t)
+	line, _ := m.view.LineOf(2)
+	m.vp.SetYOffset(line - 2)
+	m = press(t, m, "tab")
+	if m.focus != 2 {
+		t.Errorf("focus %d, want the first link in view (2)", m.focus)
+	}
+}
+
+func TestResizeKeepsTheFocus(t *testing.T) {
+	m, _ := open(t)
+	m = press(t, m, "tab", "tab")
+	next, _ := m.Update(tea.WindowSizeMsg{Width: 40, Height: 20})
+	m = next.(Model)
+	if m.focus != 2 || !strings.Contains(m.View().Content, "\x1b[7m[2]") {
+		t.Errorf("focus %d lost after resize", m.focus)
+	}
+}

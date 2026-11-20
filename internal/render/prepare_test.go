@@ -40,7 +40,7 @@ func TestPrepareNumbersLinksInOrder(t *testing.T) {
 			t.Errorf("link %d: %#v", i, links[i])
 		}
 	}
-	for _, marker := range []string{"one [1]", "two [2]", "three [3]"} {
+	for _, marker := range []string{"one " + Sentinel + "[1]", "two " + Sentinel + "[2]", "three " + Sentinel + "[3]"} {
 		if !strings.Contains(strings.ReplaceAll(got, "\\", ""), marker) {
 			t.Errorf("no %q in %q", marker, got)
 		}

@@ -31,9 +31,10 @@ type loadMsg struct {
 
 /** Model is the browser. Create it with New and give it to tea.NewProgram.
  *
- * Keys: a number then Enter follows that link; Esc clears the number;
- * b and f go back and forward; q quits; the rest scroll (arrows, PgUp, PgDn,
- * space, g, G).
+ * Keys: Tab and Shift-Tab move the focus between links and Enter follows the
+ * focused link; a number then Enter follows that link instead; Esc clears the
+ * number, or the focus; b and f go back and forward; q quits; the rest scroll
+ * (arrows, PgUp, PgDn, space, g, G).
  *
  * Example:
  *   p := tea.NewProgram(ui.New("https://dave.writersweb.org/", render.Glamour{}))
@@ -46,7 +47,8 @@ type Model struct {
 	idx    int
 	vp     viewport.Model
 	w, h   int
-	num    string
+	num    string // link number being typed
+	focus  int    // number of the focused link, 0 for none
 	status string
 	busy   bool
 }
@@ -95,7 +97,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if err := m.view.Rerender(m.r, m.width()); err != nil {
 				m.status = err.Error()
 			}
-			m.vp.SetContent(m.view.Text)
+			m.vp.SetContent(m.view.Display(m.focus))
 		}
 		return m, nil
 	case loadMsg:
@@ -125,7 +127,8 @@ func (m Model) loaded(msg loadMsg) Model {
 	} else {
 		m.idx = msg.idx
 	}
-	m.vp.SetContent(msg.v.Text)
+	m.focus = 0
+	m.vp.SetContent(msg.v.Display(0))
 	m.vp.GotoTop()
 	return m
 }
@@ -143,12 +146,22 @@ func (m Model) key(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		m.status = ""
 		return m, nil
 	case s == "esc":
+		if m.num == "" && m.focus != 0 {
+			m.setFocus(0)
+		}
 		m.num, m.status = "", ""
 		return m, nil
+	case s == "tab":
+		return m.moveFocus(1), nil
+	case s == "shift+tab":
+		return m.moveFocus(-1), nil
 	case s == "backspace" && m.num != "":
 		m.num = m.num[:len(m.num)-1]
 		return m, nil
 	case s == "enter" && m.num != "":
+		return m.follow()
+	case s == "enter" && m.focus != 0:
+		m.num = strconv.Itoa(m.focus)
 		return m.follow()
 	case s == "b" || s == "left":
 		return m.step(-1)
@@ -158,6 +171,83 @@ func (m Model) key(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	var cmd tea.Cmd
 	m.vp, cmd = m.vp.Update(msg)
 	return m, cmd
+}
+
+// focusable returns the links whose markers were found in the rendered text.
+func (m Model) focusable() []browse.Link {
+	var out []browse.Link
+	if m.view == nil {
+		return nil
+	}
+	for _, l := range m.view.Links {
+		if _, ok := m.view.LineOf(l.N); ok {
+			out = append(out, l)
+		}
+	}
+	return out
+}
+
+// moveFocus moves the focus to the next (dir 1) or previous (dir -1) link. With
+// no focus, it starts from the first link in the window going forward, and
+// from the last link in the window going back. It stops at either end.
+func (m Model) moveFocus(dir int) Model {
+	links := m.focusable()
+	if len(links) == 0 {
+		m.status = "no links on this page"
+		return m
+	}
+	m.status = ""
+	at := -1
+	for i, l := range links {
+		if l.N == m.focus {
+			at = i
+		}
+	}
+	top, bottom := m.vp.YOffset(), m.vp.YOffset()+m.vp.Height()
+	switch {
+	case at < 0 && dir > 0:
+		at = 0
+		for i, l := range links {
+			if line, _ := m.view.LineOf(l.N); line >= top {
+				at = i
+				break
+			}
+		}
+	case at < 0:
+		at = len(links) - 1
+		for i := len(links) - 1; i >= 0; i-- {
+			if line, _ := m.view.LineOf(links[i].N); line < bottom {
+				at = i
+				break
+			}
+		}
+	case at+dir < 0:
+		m.status = "first link"
+		return m
+	case at+dir >= len(links):
+		m.status = "last link"
+		return m
+	default:
+		at += dir
+	}
+	m.setFocus(links[at].N)
+	return m
+}
+
+// setFocus focuses link n (0 for none), redraws, and scrolls it into view.
+func (m *Model) setFocus(n int) {
+	m.focus = n
+	m.vp.SetContent(m.view.Display(n))
+	if n == 0 {
+		return
+	}
+	line, ok := m.view.LineOf(n)
+	if !ok {
+		return
+	}
+	if top, h := m.vp.YOffset(), m.vp.Height(); line < top || line >= top+h {
+		m.vp.SetYOffset(max(line-h/3, 0))
+	}
 }
 
 // follow opens the link whose number has been typed.
@@ -196,12 +286,19 @@ func (m Model) View() tea.View {
 		}
 		title += "  " + m.view.Page.URL
 	}
-	foot := "number+Enter follow  b back  f forward  q quit"
+	foot := "Tab focus link  Enter follow  b back  f forward  q quit"
 	switch {
 	case m.status != "":
 		foot = m.status
 	case m.num != "":
 		foot = "link " + m.num + "  (Enter to follow, Esc to cancel)"
+	}
+	if m.focus != 0 && m.status == "" && m.num == "" && m.view != nil {
+		for _, l := range m.view.Links {
+			if l.N == m.focus {
+				foot = "→ " + l.URL
+			}
+		}
 	}
 	if m.view != nil && m.status == "" && m.num == "" {
 		foot = fmt.Sprintf("%3.0f%%  %s", m.vp.ScrollPercent()*100, foot)

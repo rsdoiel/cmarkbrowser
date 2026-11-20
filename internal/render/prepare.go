@@ -10,6 +10,13 @@ import (
 	"github.com/yuin/goldmark/text"
 )
 
+/** Sentinel is a zero-width character placed before each link's [N] marker, so
+ * the marker can be found in rendered text without being confused with page
+ * text that happens to look like [3], such as a footnote. It is removed
+ * before anything is shown.
+ */
+const Sentinel = "\u2060"
+
 /** Link is a link found in a page, in reading order.
  *
  * Fields:
@@ -32,7 +39,7 @@ type edit struct {
 /** Prepare makes a page body safe and followable before rendering. It removes
  * HTML the way BonBon does (block HTML, inline tags, comments, and the content
  * of script and style elements), leaves code spans and code blocks alone, and
- * numbers each link by adding " [N]" after its text. Images are not links.
+ * numbers each link by adding " [N]" after its text (with a Sentinel before the bracket). Images are not links.
  *
  * Parameters:
  *   src (string) — the Markdown body
@@ -89,7 +96,7 @@ func Prepare(src string) (string, []Link) {
 		case *ast.Link:
 			links = append(links, Link{N: len(links) + 1, Dest: string(v.Destination), Text: plainText(v, b)})
 			if pos, ok := lastTextStop(v); ok {
-				edits = append(edits, edit{pos, pos, fmt.Sprintf(" \\[%d\\]", len(links))})
+				edits = append(edits, edit{pos, pos, fmt.Sprintf(" %s\\[%d\\]", Sentinel, len(links))})
 			}
 		}
 		return ast.WalkContinue, nil

@@ -24,7 +24,8 @@ Not applicable yet, because this is a concept experiment with nothing to release
 - [ ] Try a custom glamour style that hides the URL after link text.
 - [ ] Autolinks (`<https://...>`) and links whose text is only a code span get no `[N]` marker and, for autolinks, are not collected.
 - [ ] Remove the `internal/render` limits: `Prepare` drops later edits that start inside an earlier removed range; check with a fuzz test.
-- [ ] Link focus, as in elinks, lynx and ncgopher: move between links (Tab and Shift-Tab, maybe Up and Down), highlight the focused link, scroll to keep it in view, Enter follows it; number then Enter stays. First by searching the rendered text for the `[N]` markers (design brief, option A); keep focus state apart from how positions are found. Make the marker a form that page text cannot contain.
+- [x] Link focus, option A (2026-11-19): Tab and Shift-Tab move between links, the focused link's marker is shown in reverse video, the window scrolls to keep it in view, the address shows in the status line, Enter follows it; a typed number wins over focus; Tab starts from the first link in the window; it stops at the first and last link. Positions come from a zero-width sentinel (U+2060) before each `[N]` marker (`render.Sentinel`), found by `browse.View.LineOf`; focus state is in `internal/ui`, apart from the finder.
+- [ ] Learn from using A, then decide keys with the author: arrows for focus as in lynx or for scrolling; a links list; `g` to type an address. Known limits: only the marker is highlighted, not the whole link text; a link with no found marker cannot be focused.
 - [ ] Decide when to leave glamour (focusable links, layout glamour cannot do, tables) and move to an own renderer over a span-based intermediate form; see the design brief.
 
 ## Browsing

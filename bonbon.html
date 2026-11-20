@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="en-US">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>cmarkbrowser</title>
+    <link rel="stylesheet" href="css/site.css">
+    <link rel="alternate" type="text/markdown" href="bonbon.md">
+</head>
+<body>
+<a href="#main-content" class="visually-hidden">skip to main content</a>
+<nav>
+<ul>
+    <li><a href="index.html">Home</a></li>
+    <li><a href="user_manual.html">User Manual</a></li>
+    <li><a href="cmarkbrowser.1.html">Command Reference</a></li>
+    <li><a href="bonbon.html">BonBon</a></li>
+    <li><a href="INSTALL.html">INSTALL</a></li>
+    <li><a href="LICENSE">LICENSE</a></li>
+    <li><a href="https://github.com/rsdoiel/cmarkbrowser">Code Repository</a></li>
+</ul>
+</nav>
+<section id="main-content">
+<h1 id="cmarkbrowser-and-bonbon">cmarkbrowser and BonBon</h1>
+<p><a href="https://github.com/scripting/bonBon/">BonBon</a> is Dave
+Winer’s browser for the Markdown web: a web page can be a Markdown file,
+and the reader decides how it looks. cmarkbrowser follows the same rules
+in a terminal. This page says what is the same, what is different, and
+how this site is published for both kinds of reader.</p>
+<h2 id="what-is-the-same">What is the same</h2>
+<ul>
+<li>A page is asked for with
+<code>Accept: text/markdown, text/x-opml</code>. It is a page when the
+server says <code>text/markdown</code>, or <code>text/plain</code> or a
+generic type and the address ends in <code>.md</code> or
+<code>.markdown</code>.</li>
+<li>Front matter is read and removed. A <code>{{page.title}}</code>
+macro is filled in from it.</li>
+<li>HTML in a page is stripped. A page cannot bring styling or
+scripts.</li>
+<li>The site’s table of contents is <code>/.well-known/toc.opml</code>.
+A page with no <code>urlPrev</code> or <code>urlNext</code> takes its
+neighbours from it. <code>include</code> outlines join other outlines of
+the same site.</li>
+<li><code>Content-Location</code> names where a page’s content really
+is.</li>
+<li><code>bonbon.json</code>: <code>urlMirrorOf</code> names the HTML
+site a Markdown site mirrors, and a link into that HTML site opens the
+Markdown copy when it exists.</li>
+<li>XML and text open as source, images and other files as a note.</li>
+</ul>
+<h2 id="what-is-different">What is different</h2>
+<ul>
+<li><strong>Terminal, not a window.</strong> Links are numbered and
+focused with Tab. A picture is a note with its address, not an
+image.</li>
+<li><strong>HTML links stay in the terminal.</strong> BonBon sends a
+clicked HTML link to your system browser. cmarkbrowser shows it in
+reader view.</li>
+<li><strong>The next and previous page by calendar.</strong> antennaApp
+writes its posts oldest first, as BonBon reads them. cmarkbrowser also
+reads Dave Winer’s newest-first files by looking at the numbers in their
+calendar outlines.</li>
+<li><strong>Local sites.</strong> <code>cmarkbrowser ./</code> browses a
+folder with no server, within a site root. The <a
+href="user_manual.html">User Manual</a> has the rules.</li>
+<li><strong>Editing.</strong> <code>e</code> opens the page in your
+editor.</li>
+<li><strong>No search server or live reload.</strong>
+<code>urlSearch</code> and <code>urlUpdateSocket</code> in
+<code>bonbon.json</code> need a server program, and cmarkbrowser uses
+neither yet.</li>
+</ul>
+<h2 id="how-this-documentation-is-published-for-both">How this
+documentation is published for both</h2>
+<p>The pages here are written once, in Markdown. The build makes:</p>
+<ul>
+<li>a <code>.html</code> page beside each <code>.md</code> page, for an
+ordinary browser. Links between pages are written as <code>.md</code>
+links in the source, because the Markdown is the truth, and become
+<code>.html</code> links in the HTML;</li>
+<li>the Markdown pages themselves, unchanged, at their <code>.md</code>
+addresses. A host that serves <code>.md</code> as
+<code>text/markdown</code> or <code>text/plain</code> works for
+BonBon;</li>
+<li><code>index.md</code>, a copy of the README, so the site’s address
+opens a page;</li>
+<li><code>/.well-known/toc.opml</code>, the table of contents, listing
+the pages in order;</li>
+<li>a <code>&lt;link rel="alternate" type="text/markdown"&gt;</code> in
+each HTML page’s head, so a reader that finds the HTML page can find its
+Markdown;</li>
+<li>an empty <code>.nojekyll</code> file, so GitHub Pages serves the
+<code>.well-known</code> folder.</li>
+</ul>
+<p>Check it before you publish. <code>cmarkbrowser ./</code> in the
+built folder reads the site as a BonBon browser would, and
+<code>]</code> and <code>[</code> walk the table of contents.</p>
+<p>The table of contents is at the folder of this site. BonBon asks only
+the address root of a host, so a site published in a sub-folder (as this
+one is, at <code>/cmarkbrowser/</code>) is found by BonBon when the
+host’s own <code>/.well-known/toc.opml</code> has an
+<code>include</code> outline pointing at it. cmarkbrowser looks in the
+folders above a page as well.</p>
+</section>
+<footer>
+<p>cmarkbrowser, a terminal browser for the Markdown web. This page is also published as <a href="bonbon.md">Markdown</a>.</p>
+</footer>
+</body>
+</html>

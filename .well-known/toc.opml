@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<opml version="2.0">
+	<head>
+		<title>cmarkbrowser</title>
+		<dateModified>Thu, 19 Nov 2026 16:20:34 -0800</dateModified>
+	</head>
+	<body>
+		<outline text="Pages">
+			<outline text="cmarkbrowser" url="https://rsdoiel.github.io/cmarkbrowser/index.md"></outline>
+			<outline text="cmarkbrowser User Manual" url="https://rsdoiel.github.io/cmarkbrowser/user_manual.md"></outline>
+			<outline text="cmarkbrowser command reference" url="https://rsdoiel.github.io/cmarkbrowser/cmarkbrowser.1.md"></outline>
+			<outline text="cmarkbrowser and BonBon" url="https://rsdoiel.github.io/cmarkbrowser/bonbon.md"></outline>
+			<outline text="Installing cmarkbrowser" url="https://rsdoiel.github.io/cmarkbrowser/INSTALL.md"></outline>
+		</outline>
+	</body>
+</opml>

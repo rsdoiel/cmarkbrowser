@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="en-US">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>cmarkbrowser</title>
+    <link rel="stylesheet" href="css/site.css">
+    <link rel="alternate" type="text/markdown" href="INSTALL.md">
+</head>
+<body>
+<a href="#main-content" class="visually-hidden">skip to main content</a>
+<nav>
+<ul>
+    <li><a href="index.html">Home</a></li>
+    <li><a href="user_manual.html">User Manual</a></li>
+    <li><a href="cmarkbrowser.1.html">Command Reference</a></li>
+    <li><a href="bonbon.html">BonBon</a></li>
+    <li><a href="INSTALL.html">INSTALL</a></li>
+    <li><a href="LICENSE">LICENSE</a></li>
+    <li><a href="https://github.com/rsdoiel/cmarkbrowser">Code Repository</a></li>
+</ul>
+</nav>
+<section id="main-content">
+<h1 id="installing-cmarkbrowser">Installing cmarkbrowser</h1>
+<p>cmarkbrowser is a single program written in Go. There is no release
+yet, so you build it from the source.</p>
+<h2 id="requirements">Requirements</h2>
+<ul>
+<li>Go 1.27.3 or later</li>
+<li>GNU Make 3 or later (optional; the commands below are what it
+runs)</li>
+<li>Pandoc 3.1.11 or later, only to build this website</li>
+</ul>
+<h2 id="build-and-install">Build and install</h2>
+<pre class="shell"><code>git clone https://github.com/rsdoiel/cmarkbrowser
+cd cmarkbrowser
+make
+make install</code></pre>
+<p><code>make</code> builds <code>bin/cmarkbrowser</code>.
+<code>make install</code> copies it to <code>$HOME/bin</code>, or to
+<code>prefix/bin</code> when you run
+<code>make install prefix=/usr/local</code>. Without make:</p>
+<pre class="shell"><code>go build -o bin/cmarkbrowser ./cmd/cmarkbrowser</code></pre>
+<p>Run the tests with <code>make test</code>.</p>
+<h2 id="try-it">Try it</h2>
+<pre class="shell"><code>cmarkbrowser -version
+cmarkbrowser https://rsdoiel.github.io/blog/index.md
+cmarkbrowser -dump https://dave.writersweb.org/</code></pre>
+<p>The browser needs a terminal. <code>-dump</code> prints a page and
+its links and works in a pipe. See the <a href="user_manual.html">User
+Manual</a> for the keys.</p>
+<h2 id="editing-pages">Editing pages</h2>
+<p>Press <code>e</code> to edit the page you are reading. cmarkbrowser
+starts the editor named by <code>$VISUAL</code>, else
+<code>$EDITOR</code>, and guesses none, so set one:</p>
+<pre class="shell"><code>export EDITOR=nano</code></pre>
+<h2 id="files-it-writes">Files it writes</h2>
+<p>cmarkbrowser has no settings file. In the folder you start it from it
+keeps <code>history.md</code> (every page you visit, newest first) and,
+if you press <code>m</code>, <code>bookmarks.md</code>.
+<code>-no-history</code> turns the history off. A copy of a remote page
+that you edit goes in your <code>Downloads</code> folder.</p>
+<h2 id="building-this-website">Building this website</h2>
+<pre class="shell"><code>make website</code></pre>
+<p>writes an HTML page beside each Markdown page, <code>index.md</code>,
+<code>.nojekyll</code> and <code>.well-known/toc.opml</code>.
+<code>make publish</code> merges into the <code>gh-pages</code> branch
+and pushes it. See <a href="bonbon.html">BonBon</a> for what the
+Markdown side is for.</p>
+</section>
+<footer>
+<p>cmarkbrowser, a terminal browser for the Markdown web. This page is also published as <a href="INSTALL.md">Markdown</a>.</p>
+</footer>
+</body>
+</html>

@@ -1,9 +1,10 @@
-
 # cmarkbrowser
 
 A terminal browser for the Markdown web, after Dave Winer's
-[BonBon](https://github.com/scripting/bonBon/). It is a concept experiment
-built on the Charm libraries (bubbletea v2, rendering with glamour); nothing browses yet.
+[BonBon](https://github.com/scripting/bonBon/). It fetches a page as Markdown,
+strips the HTML in it, follows its links and its site's table of contents, and
+lets you choose how the text looks. It also browses a Markdown site on your own
+file system, with no web server, to preview a site and edit it.
 
 BonBon's idea is that a web page can be a Markdown file. HTML in a page is
 stripped, a page cannot bring its own styling or scripts, and the reader
@@ -15,12 +16,28 @@ sized reader for the same pages, and a way to test what
 
 ## Status
 
-A working spike. `cmarkbrowser URL` opens a page in a terminal viewer. Tab and
-Shift-Tab move between links and Enter follows the focused one; or type a
-link's number and press Enter. `b` and `f` go back and forward, `q` quits. `cmarkbrowser -dump URL` prints the rendered page and its links.
-Pages are fetched with BonBon's `Accept` header, front matter and HTML are
-stripped, and Markdown is rendered with glamour. No `toc.opml`, search or
-local-directory sites yet; see TODO.md.
+A concept experiment that works and is used: it has not been released.
+
+- Open a page: `cmarkbrowser https://rsdoiel.github.io/blog/index.md`.
+- Follow links with Tab and Enter, or by number; back, forward, search, bookmarks,
+  history, the next and previous page from the site's table of contents.
+- Browse a folder as a site: `cmarkbrowser ./`.
+- Edit the page you are reading in your own editor with `e`.
+
+The [User Manual](user_manual.md) says how, the
+[Command Reference](cmarkbrowser.1.md) lists every key and option, and
+[BonBon](bonbon.md) says how cmarkbrowser and BonBon differ.
+
+## This documentation is a Markdown site too
+
+These pages are published twice from the same source: as an HTML website, and
+as Markdown for BonBon browsers and cmarkbrowser. Every page has a `.md`
+address beside its `.html` address, the site's home page is `index.md`, and the
+table of contents is `/.well-known/toc.opml`. Read it in a terminal:
+
+~~~shell
+cmarkbrowser https://rsdoiel.github.io/cmarkbrowser/
+~~~
 
 ### Authors
 
@@ -32,6 +49,7 @@ local-directory sites yet; see TODO.md.
 
 ## Related resources
 
+- [INSTALL](INSTALL.md)
 - [BonBon charter](https://github.com/scripting/bonBon/blob/main/docs/charter.md)
 - [Textcasting](https://textcasting.org/)
 - [Getting Help, Reporting bugs](https://github.com/rsdoiel/cmarkbrowser/issues)

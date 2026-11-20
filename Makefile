@@ -14,7 +14,7 @@ ifneq ($(prefix),)
 	PREFIX = $(prefix)
 endif
 
-.PHONY: all build test generate clean install
+.PHONY: all build test generate clean install docs website publish
 
 all: build
 
@@ -32,6 +32,21 @@ generate:
 
 install: build
 	for P in $(PROGRAMS); do install -m 755 bin/$$P $(PREFIX)/bin/$$P; done
+
+# docs writes the command reference from the program's own help, so the two
+# cannot differ.
+docs: build
+	( printf '# cmarkbrowser command reference\n\n'; \
+	  printf 'This page is written by `cmarkbrowser -help`.\n\n'; \
+	  ./bin/cmarkbrowser -help | sed '1,3d; s/^# /## /' ) > cmarkbrowser.1.md
+
+# website builds the HTML pages, index.md, .nojekyll and .well-known/toc.opml.
+website: docs
+	$(MAKE) -f website.mak
+
+# publish merges into the gh-pages branch and pushes it (see publish.bash).
+publish: website
+	./publish.bash
 
 clean:
 	rm -rf bin dist

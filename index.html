@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="en-US">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>cmarkbrowser</title>
+    <link rel="stylesheet" href="css/site.css">
+    <link rel="alternate" type="text/markdown" href="index.md">
+</head>
+<body>
+<a href="#main-content" class="visually-hidden">skip to main content</a>
+<nav>
+<ul>
+    <li><a href="index.html">Home</a></li>
+    <li><a href="user_manual.html">User Manual</a></li>
+    <li><a href="cmarkbrowser.1.html">Command Reference</a></li>
+    <li><a href="bonbon.html">BonBon</a></li>
+    <li><a href="INSTALL.html">INSTALL</a></li>
+    <li><a href="LICENSE">LICENSE</a></li>
+    <li><a href="https://github.com/rsdoiel/cmarkbrowser">Code Repository</a></li>
+</ul>
+</nav>
+<section id="main-content">
+<h1 id="cmarkbrowser">cmarkbrowser</h1>
+<p>A terminal browser for the Markdown web, after Dave Winer’s <a
+href="https://github.com/scripting/bonBon/">BonBon</a>. It fetches a
+page as Markdown, strips the HTML in it, follows its links and its
+site’s table of contents, and lets you choose how the text looks. It
+also browses a Markdown site on your own file system, with no web
+server, to preview a site and edit it.</p>
+<p>BonBon’s idea is that a web page can be a Markdown file. HTML in a
+page is stripped, a page cannot bring its own styling or scripts, and
+the reader chooses how text looks. A site’s table of contents is an OPML
+file at <code>/.well-known/toc.opml</code>, and a page is asked for with
+<code>Accept: text/markdown, text/x-opml</code>. cmarkbrowser is a
+second, terminal sized reader for the same pages, and a way to test what
+<a href="https://github.com/rsdoiel/antennaApp">antennaApp</a> publishes
+for them.</p>
+<h2 id="status">Status</h2>
+<p>A concept experiment that works and is used: it has not been
+released.</p>
+<ul>
+<li>Open a page:
+<code>cmarkbrowser https://rsdoiel.github.io/blog/index.md</code>.</li>
+<li>Follow links with Tab and Enter, or by number; back, forward,
+search, bookmarks, history, the next and previous page from the site’s
+table of contents.</li>
+<li>Browse a folder as a site: <code>cmarkbrowser ./</code>.</li>
+<li>Edit the page you are reading in your own editor with
+<code>e</code>.</li>
+</ul>
+<p>The <a href="user_manual.html">User Manual</a> says how, the <a
+href="cmarkbrowser.1.html">Command Reference</a> lists every key and
+option, and <a href="bonbon.html">BonBon</a> says how cmarkbrowser and
+BonBon differ.</p>
+<h2 id="this-documentation-is-a-markdown-site-too">This documentation is
+a Markdown site too</h2>
+<p>These pages are published twice from the same source: as an HTML
+website, and as Markdown for BonBon browsers and cmarkbrowser. Every
+page has a <code>.md</code> address beside its <code>.html</code>
+address, the site’s home page is <code>index.md</code>, and the table of
+contents is <code>/.well-known/toc.opml</code>. Read it in a
+terminal:</p>
+<pre class="shell"><code>cmarkbrowser https://rsdoiel.github.io/cmarkbrowser/</code></pre>
+<h3 id="authors">Authors</h3>
+<ul>
+<li>Doiel, R. S.</li>
+</ul>
+<h2 id="software-requirements">Software Requirements</h2>
+<ul>
+<li>Go &gt;= 1.27.3</li>
+</ul>
+<h2 id="related-resources">Related resources</h2>
+<ul>
+<li><a href="INSTALL.html">INSTALL</a></li>
+<li><a
+href="https://github.com/scripting/bonBon/blob/main/docs/charter.md">BonBon
+charter</a></li>
+<li><a href="https://textcasting.org/">Textcasting</a></li>
+<li><a href="https://github.com/rsdoiel/cmarkbrowser/issues">Getting
+Help, Reporting bugs</a></li>
+<li><a
+href="https://www.gnu.org/licenses/agpl-3.0.en.html">LICENSE</a></li>
+</ul>
+</section>
+<footer>
+<p>cmarkbrowser, a terminal browser for the Markdown web. This page is also published as <a href="index.md">Markdown</a>.</p>
+</footer>
+</body>
+</html>

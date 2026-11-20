@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="en-US">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>cmarkbrowser</title>
+    <link rel="stylesheet" href="css/site.css">
+    <link rel="alternate" type="text/markdown" href="user_manual.md">
+</head>
+<body>
+<a href="#main-content" class="visually-hidden">skip to main content</a>
+<nav>
+<ul>
+    <li><a href="index.html">Home</a></li>
+    <li><a href="user_manual.html">User Manual</a></li>
+    <li><a href="cmarkbrowser.1.html">Command Reference</a></li>
+    <li><a href="bonbon.html">BonBon</a></li>
+    <li><a href="INSTALL.html">INSTALL</a></li>
+    <li><a href="LICENSE">LICENSE</a></li>
+    <li><a href="https://github.com/rsdoiel/cmarkbrowser">Code Repository</a></li>
+</ul>
+</nav>
+<section id="main-content">
+<h1 id="cmarkbrowser-user-manual">cmarkbrowser User Manual</h1>
+<p>cmarkbrowser reads the Markdown web in a terminal. This page is how
+to use it; the <a href="cmarkbrowser.1.html">Command Reference</a> lists
+every key and option. Run it with an address or a path:</p>
+<pre class="shell"><code>cmarkbrowser https://rsdoiel.github.io/blog/index.md
+cmarkbrowser ./</code></pre>
+<h2 id="reading">Reading</h2>
+<p>Arrow keys, PgUp, PgDn, space, <code>g</code> and <code>G</code>
+scroll. <code>q</code> quits.</p>
+<p>Links are numbered, like <code>[3]</code>. Press Tab to move to the
+next link, Shift-Tab to the previous one, and Enter to follow the
+focused link. Or type a link’s number and press Enter. <code>b</code>
+goes back and <code>f</code> goes forward. Esc undoes one thing: a typed
+number, then the focus, then a search.</p>
+<p>A page is Markdown with optional front matter. HTML inside a page is
+removed, as a BonBon browser does, and a page cannot change how it
+looks.</p>
+<h2 id="opening-an-address">Opening an address</h2>
+<p>Press <code>o</code>, type an address and press Enter. An address
+starts with <code>http://</code> or <code>https://</code>; a bare host
+such as <code>example.org/a.md</code> gets <code>https://</code>. A file
+name is not accepted here (see Local sites). <code>Esc</code>
+cancels.</p>
+<h2 id="the-next-and-previous-page">The next and previous page</h2>
+<p><code>]</code> opens the next page and <code>[</code> the previous
+one. A page can name them in its own front matter as
+<code>urlNext</code> and <code>urlPrev</code>. When it names none,
+cmarkbrowser asks the site’s table of contents,
+<code>/.well-known/toc.opml</code>: it reads the site root’s file first,
+then the folders between the root and the page, and follows the outlines
+it includes from the same site. A site with no table of contents says so
+in the status line.</p>
+<h2 id="searching">Searching</h2>
+<p>Press <code>/</code>, type a regular expression and press Enter.
+Every match is marked and the page scrolls to the first one.
+<code>n</code> and <code>N</code> go to the next and previous match. A
+pattern with no capital letters ignores case. <code>/</code> then Enter
+repeats the last search.</p>
+<h2 id="history-and-bookmarks">History and bookmarks</h2>
+<p>Every web page you visit is added to <code>history.md</code> in the
+folder you started in, newest first, and <code>H</code> opens it as a
+page: click back to where you left off. Start cmarkbrowser with no
+address and it opens the history. <code>-no-history</code> records
+nothing and <code>-history FILE</code> uses another file.</p>
+<p>Press <code>m</code> to add the page you are reading to
+<code>bookmarks.md</code>, and <code>B</code> to open it. Both files are
+plain Markdown that you can read, edit and keep under version
+control.</p>
+<h2 id="links-that-are-not-pages">Links that are not pages</h2>
+<ul>
+<li>A link to an HTML page with a Markdown copy opens the copy.</li>
+<li>An HTML page with none opens in <strong>reader view</strong>: its
+text, links and picture descriptions, without scripts, styles or
+menus.</li>
+<li>XML (RSS, Atom, OPML) and text (JSON, YAML, CSV, code) open as
+<strong>source</strong>, in a block, up to 1 MB, with control characters
+removed.</li>
+<li>An image or any other file is a <strong>note</strong> with its type,
+size and address. It is not downloaded, and a terminal cannot show a
+picture.</li>
+</ul>
+<h2 id="local-sites">Local sites</h2>
+<p>Give a path instead of an address to browse a Markdown site on your
+own file system, with no web server and no <code>file://</code>
+address:</p>
+<pre class="shell"><code>cmarkbrowser ./          # this folder, starting at index.md
+cmarkbrowser notes/a.md  # a file; its site is the folder above with a toc.opml, or its own</code></pre>
+<p>The folder you give is the <strong>site root</strong>. A link in a
+page is a path: <code>b.md</code> is next to the page,
+<code>../c.md</code> is above it, and <code>/d.md</code> is relative to
+the site root, as it is on the web. A link to <code>x.html</code> opens
+<code>x.md</code> when there is one, and a link to a folder opens its
+<code>index.md</code>. A link to an <code>http://</code> or
+<code>https://</code> address goes to the web.</p>
+<p>Nothing a page says can reach outside the site root: a link that
+leaves it, by <code>..</code> or through a symlink, is refused, and so
+is any <code>file:</code> address. <code>]</code> and <code>[</code>
+read <code>.well-known/toc.opml</code> from the folder, so a site you
+have not published yet works. Local pages are not written to the history
+and cannot be bookmarked.</p>
+<h2 id="editing">Editing</h2>
+<p>Press <code>e</code> to edit the page you are reading in
+<code>$VISUAL</code>, else <code>$EDITOR</code>. The browser steps aside
+while the editor runs and shows the page again, at the same place, when
+you quit it. A local file is edited in place. A page from the web cannot
+be saved back, so its source is saved as a new file in your
+<code>Downloads</code> folder and that copy is edited. Together with
+local sites this makes a preview loop: edit, quit the editor, read the
+result.</p>
+<h2 id="printing-a-page">Printing a page</h2>
+<p><code>cmarkbrowser -dump ADDRESS</code> writes the rendered page and
+a numbered list of its links to standard output, and
+<code>-style notty</code> leaves out the colors:</p>
+<pre class="shell"><code>cmarkbrowser -dump -style notty https://rsdoiel.github.io/blog/index.md | less</code></pre>
+<h2 id="exit-codes">Exit codes</h2>
+<table>
+<thead>
+<tr class="header">
+<th scope="col">Code</th>
+<th scope="col">Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>0</td>
+<td>Success.</td>
+</tr>
+<tr class="even">
+<td>2</td>
+<td>Bad command line.</td>
+</tr>
+<tr class="odd">
+<td>65</td>
+<td>The page is not text, or its front matter is not valid.</td>
+</tr>
+<tr class="even">
+<td>66</td>
+<td>The page, path or index.md is not there.</td>
+</tr>
+<tr class="odd">
+<td>69</td>
+<td>The server cannot be reached.</td>
+</tr>
+<tr class="even">
+<td>77</td>
+<td>The operating system refused access to the path.</td>
+</tr>
+</tbody>
+</table>
+<h2 id="when-something-looks-wrong">When something looks wrong</h2>
+<p><code>-debug FILE</code> appends a log of the session to
+<code>FILE</code>, one JSON object per line: every key, every address
+tried with its status and time, and the exit code. It holds addresses
+and counts, never page content. Send it with a bug report to the <a
+href="https://github.com/rsdoiel/cmarkbrowser/issues">issue
+tracker</a>.</p>
+</section>
+<footer>
+<p>cmarkbrowser, a terminal browser for the Markdown web. This page is also published as <a href="user_manual.md">Markdown</a>.</p>
+</footer>
+</body>
+</html>

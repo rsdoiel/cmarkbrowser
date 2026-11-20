@@ -5,6 +5,10 @@ Ideas, not quite a roadmap. The design brief is
 `agents/projects/cmarkbrowser/design/cmarkbrowser-design.md` in the Laboratory
 workspace.
 
+## Bug
+
+- [ ] The numbered links are really ugly if a table contains links (antenna website homepage is a good example). It also make footnotes/endnotes problematic visually
+
 ## Scaffold (2026-11-19)
 
 - [x] go.mod (Go 1.27.3), codemeta.json (CodeMeta 3.0), version.go, LICENSE, .gitignore, Makefile (build, test, generate, install, clean).

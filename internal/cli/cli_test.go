@@ -374,7 +374,7 @@ func TestAnExplicitHistoryFileIsTheStartPage(t *testing.T) {
 
 func TestHelpDocumentsOpenAndHistory(t *testing.T) {
 	_, out, _ := run("-h")
-	for _, want := range []string{"-history FILE", "-no-history", "o asks for an address", "H opens", "site root", "no web server and no protocol"} {
+	for _, want := range []string{"-history FILE", "-no-history", "o asks for an address", "H opens", "site root", "no web server and no protocol", "e edits the page", "$VISUAL"} {
 		if !strings.Contains(out, want) {
 			t.Errorf("help lacks %q", want)
 		}

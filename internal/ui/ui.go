@@ -77,11 +77,13 @@ type Model struct {
 	histPath   string // "" records nothing
 
 	// bookmarks and local files
-	bmPath     string          // the bookmarks file, "" for bookmarks.md
-	localStart bool            // the start argument is a file the person named
-	localOK    map[string]bool // file addresses the person opened; a link never adds to it
-	site       *local.Site     // the site root the person opened a local site at (DR-0001), nil for none
-	rooted     map[string]bool // local pages opened inside the site root, so their links are paths
+	bmPath        string          // the bookmarks file, "" for bookmarks.md
+	localStart    bool            // the start argument is a file the person named
+	localOK       map[string]bool // file addresses the person opened; a link never adds to it
+	restoreAddr   string          // after an edit, the page to put back at restoreOffset
+	restoreOffset int
+	site          *local.Site     // the site root the person opened a local site at (DR-0001), nil for none
+	rooted        map[string]bool // local pages opened inside the site root, so their links are paths
 }
 
 /** New returns a browser that opens start when it runs.
@@ -212,6 +214,8 @@ func (m Model) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 	case loadMsg:
 		return m.loaded(msg), nil
+	case editDoneMsg:
+		return m.editDone(msg)
 	case tocMsg:
 		return m.tocAnswered(msg)
 	case tea.KeyPressMsg:
@@ -224,6 +228,7 @@ func (m Model) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 func (m Model) loaded(msg loadMsg) Model {
 	m.busy = false
 	if msg.err != nil {
+		m.restoreAddr = ""
 		m.log.Event("load.done", "addr", msg.addr, "ok", false, "err", msg.err, "ms", msg.took)
 		m.status = msg.err.Error()
 		return m
@@ -250,6 +255,10 @@ func (m Model) loaded(msg loadMsg) Model {
 	m.prompt, m.query, m.matches, m.marked, m.pattern, m.cur = false, "", nil, nil, "", 0
 	m.vp.SetContent(msg.v.Display(0))
 	m.vp.GotoTop()
+	if m.restoreAddr != "" && m.restoreAddr == msg.v.Page.URL {
+		m.vp.SetYOffset(m.restoreOffset) // back where the edit began, clamped to the new length
+	}
+	m.restoreAddr = ""
 	return m.record()
 }
 
@@ -285,6 +294,8 @@ func (m Model) key(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 	case s == "m" && m.num == "":
 		return m.mark(), nil
+	case s == "e" && m.num == "":
+		return m.editPage()
 	case s == "o" && m.num == "":
 		return m.openAddrPrompt(), nil
 	case s == "H" && m.num == "":

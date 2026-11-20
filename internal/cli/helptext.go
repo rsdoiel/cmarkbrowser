@@ -89,6 +89,15 @@ to preview a site and edit it: local pages are never recorded in the history
 file and cannot be bookmarked. A directory with no index.md is exit 66; a
 file: address on the command line is a usage error.
 
+e edits the page being shown in your text editor ($VISUAL, else $EDITOR; a
+value such as "code -w" works; neither set is a message, not a guess). The
+browser steps aside while the editor runs and shows the page again, at the same
+place, when it exits. A local file (a page of a local site, the bookmarks file,
+the history file) is edited in place. A remote page cannot be saved back, so
+its source, front matter included, is saved as a new file in your Downloads
+folder (never replacing one, a.md then a-1.md) and that copy is edited; keep it
+or delete it. A reader view has no Markdown source and is refused.
+
 Local files are otherwise opened only through B and H, never from a link.
 
 A link to an HTML page that has no Markdown copy is shown in reader view: its

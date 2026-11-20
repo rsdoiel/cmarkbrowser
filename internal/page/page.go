@@ -67,11 +67,14 @@ const maxBody = 8 << 20
  *   Meta (map[string]any) — the front matter, empty when there is none
  *   Body (string) — the Markdown with the front matter removed
  *   Reader (bool) — Body is a reader view made from an HTML page
+ *   Raw (string) — the page as received, front matter included, for saving a
+ *     copy to edit; empty for a reader view
  */
 type Page struct {
 	URL    string
 	Meta   map[string]any
 	Body   string
+	Raw    string
 	Reader bool // the Body is a reader view of an HTML page, not the page's own Markdown
 }
 
@@ -128,7 +131,7 @@ func (p *Page) URLPrev() string { return p.str("urlPrev") }
  *   p, err := page.Parse([]byte("---\ntitle: Hi\n---\ntext\n"))
  */
 func Parse(src []byte) (*Page, error) {
-	p := &Page{Meta: map[string]any{}, Body: string(src)}
+	p := &Page{Meta: map[string]any{}, Body: string(src), Raw: string(src)}
 	s := strings.ReplaceAll(string(src), "\r\n", "\n")
 	if !strings.HasPrefix(s, "---\n") {
 		return p, nil

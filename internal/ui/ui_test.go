@@ -15,6 +15,7 @@ import (
 	"github.com/rsdoiel/cmarkbrowser/internal/debuglog"
 	"github.com/rsdoiel/cmarkbrowser/internal/render"
 	"github.com/rsdoiel/cmarkbrowser/internal/search"
+	"github.com/rsdoiel/cmarkbrowser/internal/toc"
 )
 
 func site(t *testing.T) *httptest.Server {
@@ -959,4 +960,196 @@ func TestContentLocationIsWhatIsShownBookmarkedAndRevisited(t *testing.T) {
 	if hits["/dir/index.md"] == 0 {
 		t.Errorf("history should return to /dir/index.md; hits %v", hits)
 	}
+}
+
+// tocSite serves pages with no urlNext or urlPrev of their own, and the table
+// of contents that lists them: Pages a, b, c, and Posts newest first.
+func tocUISite(t *testing.T) (*httptest.Server, map[string]int) {
+	t.Helper()
+	hits := map[string]int{}
+	pages := map[string]string{
+		"/p/a.md":      "# Page A\n",
+		"/p/b.md":      "# Page B\n",
+		"/p/c.md":      "# Page C\n",
+		"/p/keyed.md":  "---\nurlNext: c.md\n---\n# Keyed\n",
+		"/blog/new.md": "# New post\n",
+		"/blog/mid.md": "# Mid post\n",
+		"/blog/old.md": "# Old post\n",
+		"/lone.md":     "# Lone page\n",
+	}
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		hits[r.URL.Path]++
+		if r.URL.Path == "/.well-known/toc.opml" {
+			w.Header().Set("Content-Type", "text/x-opml; charset=utf-8")
+			fmt.Fprintf(w, `<?xml version="1.0" encoding="UTF-8"?><opml version="2.0"><head/><body>
+			<outline text="Pages">
+				<outline text="A" url="http://%[1]s/p/a.md"/><outline text="B" url="http://%[1]s/p/b.md"/><outline text="C" url="http://%[1]s/p/c.md"/><outline text="Keyed" url="http://%[1]s/p/keyed.md"/></outline>
+			<outline text="Posts"><outline text="2026" type="calendarYear">
+				<outline text="New" url="http://%[1]s/blog/new.md"/><outline text="Mid" url="http://%[1]s/blog/mid.md"/><outline text="Old" url="http://%[1]s/blog/old.md"/></outline></outline>
+			</body></opml>`, r.Host)
+			return
+		}
+		body, ok := pages[r.URL.Path]
+		if !ok {
+			http.NotFound(w, r)
+			return
+		}
+		w.Header().Set("Content-Type", "text/markdown")
+		fmt.Fprint(w, body)
+	}))
+	t.Cleanup(srv.Close)
+	return srv, hits
+}
+
+func openTOC(t *testing.T, srv *httptest.Server, path string) Model {
+	t.Helper()
+	m := New(srv.URL+path, render.Glamour{Style: "notty"})
+	m = drive(t, m, m.Init())
+	next, _ := m.Update(tea.WindowSizeMsg{Width: 100, Height: 24})
+	return next.(Model)
+}
+
+func TestNextAndPreviousUseTheTableOfContentsWhenThePageNamesNone(t *testing.T) {
+	srv, _ := tocUISite(t)
+	m := openTOC(t, srv, "/p/b.md")
+	m = press(t, m, "]")
+	if !strings.Contains(m.View().Content, "Page C") {
+		t.Fatalf("after ]:\n%s", m.View().Content)
+	}
+	m = press(t, m, "[", "[")
+	if !strings.Contains(m.View().Content, "Page A") {
+		t.Errorf("after [ [:\n%s", m.View().Content)
+	}
+	// they are visits: back returns to the page before
+	m = press(t, m, "b")
+	if !strings.Contains(m.View().Content, "Page B") {
+		t.Errorf("back:\n%s", m.View().Content)
+	}
+}
+
+// In a list with calendar outlines the lines run newest first, so the
+// previous page is the older one, the line below (antennaApp DR-0013 5).
+func TestInPostsPreviousIsOlderAndNextIsNewer(t *testing.T) {
+	srv, _ := tocUISite(t)
+	m := openTOC(t, srv, "/blog/mid.md")
+	m = press(t, m, "[")
+	if !strings.Contains(m.View().Content, "Old post") {
+		t.Errorf("previous of the middle post should be the old one:\n%s", m.View().Content)
+	}
+	m = press(t, m, "]", "]")
+	if !strings.Contains(m.View().Content, "New post") {
+		t.Errorf("two steps newer:\n%s", m.View().Content)
+	}
+}
+
+func TestAPagesOwnKeysWinAndNoTableOfContentsIsFetchedForThem(t *testing.T) {
+	srv, hits := tocUISite(t)
+	m := openTOC(t, srv, "/p/keyed.md")
+	m = press(t, m, "]")
+	if !strings.Contains(m.View().Content, "Page C") {
+		t.Fatalf("urlNext not followed:\n%s", m.View().Content)
+	}
+	if hits["/.well-known/toc.opml"] != 0 {
+		t.Errorf("the table of contents was fetched although the page named its next page: %v", hits)
+	}
+}
+
+// The table of contents is read when a key needs it, not when a page loads.
+func TestNothingIsFetchedUntilAKeyNeedsIt(t *testing.T) {
+	srv, hits := tocUISite(t)
+	m := openTOC(t, srv, "/p/b.md")
+	press(t, m, "j", "tab")
+	if hits["/.well-known/toc.opml"] != 0 {
+		t.Errorf("the table of contents was fetched without being needed: %v", hits)
+	}
+}
+
+func TestTheEndsOfAListAndUnlistedPagesSaySoAndStay(t *testing.T) {
+	srv, _ := tocUISite(t)
+	m := openTOC(t, srv, "/p/a.md")
+	m = press(t, m, "[")
+	if out := m.View().Content; !strings.Contains(out, "no previous page") || !strings.Contains(out, "Page A") {
+		t.Errorf("first page, [:\n%s", out)
+	}
+	m = openTOC(t, srv, "/lone.md") // a page the outline does not list
+	m = press(t, m, "]")
+	if out := m.View().Content; !strings.Contains(out, "no next page") || !strings.Contains(out, "table of contents") || !strings.Contains(out, "Lone page") {
+		t.Errorf("unlisted page, ]:\n%s", out)
+	}
+}
+
+func TestASiteWithNoTableOfContentsSaysSo(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/x.md" {
+			w.Header().Set("Content-Type", "text/markdown")
+			fmt.Fprint(w, "# Only page\n")
+			return
+		}
+		http.NotFound(w, r)
+	}))
+	defer srv.Close()
+	m := openTOC(t, srv, "/x.md")
+	m = press(t, m, "]")
+	if out := m.View().Content; !strings.Contains(out, "no next page") || !strings.Contains(out, "Only page") {
+		t.Errorf("view:\n%s", out)
+	}
+}
+
+// A reader view or a local file is not a page of the Markdown web: no lookup.
+func TestNoLookupForReaderViewsOrLocalFiles(t *testing.T) {
+	hits := map[string]int{}
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		hits[r.URL.Path]++
+		switch r.URL.Path {
+		case "/h":
+			w.Header().Set("Content-Type", "text/html")
+			fmt.Fprint(w, `<html><head><title>H</title></head><body><article><h1>H</h1><p>`+strings.Repeat("Words here. ", 30)+`</p></article></body></html>`)
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer srv.Close()
+	m := openTOC(t, srv, "/h")
+	press(t, m, "]")
+	if hits["/.well-known/toc.opml"] != 0 {
+		t.Errorf("a reader view looked for a table of contents: %v", hits)
+	}
+	notes := filepath.Join(t.TempDir(), "n.md")
+	os.WriteFile(notes, []byte("# Notes\n"), 0o644)
+	lm := New(notes, render.Glamour{Style: "notty"}).WithLocalStart()
+	lm = drive(t, lm, lm.Init())
+	press(t, lm, "]") // must not panic or fetch
+}
+
+// An answer that arrives after the person has moved on is dropped.
+func TestAStaleAnswerIsDropped(t *testing.T) {
+	srv, _ := tocUISite(t)
+	m := openTOC(t, srv, "/p/b.md")
+	stale := tocMsgFor("http://elsewhere.example/other.md", 1, srv.URL+"/p/c.md")
+	next, cmd := m.Update(stale)
+	if cmd != nil {
+		t.Error("a stale answer started a load")
+	}
+	if !strings.Contains(next.(Model).View().Content, "Page B") {
+		t.Error("the page changed")
+	}
+}
+
+func TestTheLookupIsLogged(t *testing.T) {
+	srv, _ := tocUISite(t)
+	var buf bytes.Buffer
+	m := New(srv.URL+"/p/b.md", render.Glamour{Style: "notty"}).WithDebug(debuglog.New(&buf))
+	m = drive(t, m, m.Init())
+	next, _ := m.Update(tea.WindowSizeMsg{Width: 100, Height: 24})
+	press(t, next.(Model), "]")
+	for _, want := range []string{`"event":"toc.fetch"`, `"event":"toc.lookup"`, `"found":true`, `"why":"next"`} {
+		if !strings.Contains(buf.String(), want) {
+			t.Errorf("log lacks %s", want)
+		}
+	}
+}
+
+// tocMsgFor builds the message a finished lookup delivers, for the page given.
+func tocMsgFor(page string, dir int, next string) tea.Msg {
+	return tocMsg{page: page, dir: dir, res: toc.Result{Found: true, Next: next}}
 }

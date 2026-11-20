@@ -15,6 +15,7 @@ import (
 	"github.com/rsdoiel/cmarkbrowser/internal/debuglog"
 	"github.com/rsdoiel/cmarkbrowser/internal/render"
 	"github.com/rsdoiel/cmarkbrowser/internal/search"
+	"github.com/rsdoiel/cmarkbrowser/internal/toc"
 )
 
 // maxWidth keeps lines readable on a very wide terminal.
@@ -66,6 +67,8 @@ type Model struct {
 	marked      *search.Marked // the page with the matches marked, for the focus in markedFocus
 	markedFocus int
 
+	toc *toc.Finder // the site's table of contents, read when ] or [ needs it
+
 	// bookmarks and local files
 	bmPath     string          // the bookmarks file, "" for bookmarks.md
 	localStart bool            // the start argument is a file the person named
@@ -85,7 +88,7 @@ type Model struct {
  *   m := ui.New("https://x.org/a.md", render.Glamour{Style: "dark"})
  */
 func New(start string, r render.Renderer) Model {
-	return Model{r: r, start: start, idx: -1, w: 80, h: 24, localOK: map[string]bool{}, vp: viewport.New(viewport.WithWidth(80), viewport.WithHeight(22))}
+	return Model{r: r, start: start, idx: -1, w: 80, h: 24, localOK: map[string]bool{}, toc: toc.NewFinder(), vp: viewport.New(viewport.WithWidth(80), viewport.WithHeight(22))}
 }
 
 /** WithDebug returns the browser with a debug logger: every key, load, status
@@ -168,6 +171,8 @@ func (m Model) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 	case loadMsg:
 		return m.loaded(msg), nil
+	case tocMsg:
+		return m.tocAnswered(msg)
 	case tea.KeyPressMsg:
 		return m.key(msg)
 	}
@@ -284,6 +289,16 @@ func (m Model) sibling(key, none string) (tea.Model, tea.Cmd) {
 		dest = strings.TrimSpace(fmt.Sprint(v))
 	}
 	if dest == "" {
+		// The page names no such page: ask the site's table of contents
+		// (antennaApp DR-0013 5), which is read now and not when the page loads.
+		if m.canLookUpTOC() {
+			dir := -1
+			if key == "urlNext" {
+				dir = 1
+			}
+			m.busy, m.status = true, "looking in the table of contents"
+			return m, m.lookupTOC(dir)
+		}
 		m.status = none
 		return m, nil
 	}

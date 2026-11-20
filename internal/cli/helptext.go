@@ -31,7 +31,10 @@ from /.well-known/toc.opml.
 In the browser, Tab and Shift-Tab move between links (the focused link's
 address is shown at the bottom) and Enter follows it. Or type a link's number
 and press Enter. b and f go back and forward; ] and [ open the next and
-previous page that the page names in its urlNext and urlPrev front matter; Esc
+previous page that the page names in its urlNext and urlPrev front matter, or,
+when it names none, that the site's table of contents gives (the nearest
+.well-known/toc.opml above the page, with the outlines it includes; read the
+first time one of these keys needs it, and remembered); Esc
 clears a typed number, then the focus, then a search; arrows, PgUp, PgDn, space,
 g and G scroll; q quits.
 

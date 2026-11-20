@@ -1,6 +1,8 @@
 package reader
 
 import (
+	"fmt"
+	"regexp"
 	"strings"
 	"testing"
 )
@@ -167,5 +169,49 @@ func TestOutputIsCappedOnAHugePage(t *testing.T) {
 func TestBadBaseIsAnError(t *testing.T) {
 	if _, err := Convert([]byte("<p>x</p>"), "://bad"); err == nil {
 		t.Error("bad base accepted")
+	}
+}
+
+// Every heading level must come out as exactly that many # marks on a line of
+// its own. (An earlier version computed the level from the difference of two
+// atom numbers, which are hashes, not 1 to 6: <h2> became 263,425 # marks and
+// a 9 KB page became 1.3 MB.)
+func TestEachHeadingLevelIsExactlyThatManyHashMarks(t *testing.T) {
+	var html strings.Builder
+	html.WriteString("<body>")
+	for level := 1; level <= 6; level++ {
+		fmt.Fprintf(&html, "<h%d>Level %d title</h%d><p>text %d</p>", level, level, level, level)
+	}
+	html.WriteString("</body>")
+	r := convert(t, html.String())
+	for level := 1; level <= 6; level++ {
+		want := fmt.Sprintf("(?m)^%s Level %d title$", strings.Repeat("#", level), level)
+		if !regexp.MustCompile(want).MatchString(r.Markdown) {
+			t.Errorf("h%d: no line matching %s in:\n%s", level, want, r.Markdown)
+		}
+	}
+	for i, line := range strings.Split(r.Markdown, "\n") {
+		if len(line) > 200 {
+			t.Fatalf("line %d is %d bytes long: %.60s...", i, len(line), line)
+		}
+	}
+}
+
+// Whatever the page holds, the Markdown must not be wildly bigger than the HTML
+// it came from. The headings test above found a 150-fold blowup; this guards
+// the whole converter against another of that kind.
+func TestOutputIsNeverWildlyBiggerThanTheInput(t *testing.T) {
+	pages := []string{
+		"<body>" + strings.Repeat("<h1>a</h1><h2>b</h2><h3>c</h3><h4>d</h4><h5>e</h5><h6>f</h6>", 50) + "</body>",
+		"<body>" + strings.Repeat("<ul><li>x<ul><li>y<ul><li>z</li></ul></li></ul></li></ul>", 50) + "</body>",
+		"<body>" + strings.Repeat("<blockquote><blockquote><p>q</p></blockquote></blockquote>", 50) + "</body>",
+		"<body><table>" + strings.Repeat("<tr><td>a</td><td>b</td></tr>", 100) + "</table></body>",
+		"<body>" + strings.Repeat("<p><a href='/x'>l</a> <img src='i.png' alt='a'> <code>c</code> <b>b</b></p>", 100) + "</body>",
+	}
+	for i, page := range pages {
+		r := convert(t, page)
+		if limit := 3*len(page) + 1024; len(r.Markdown) > limit {
+			t.Errorf("page %d: %d bytes of HTML became %d bytes of Markdown (limit %d)", i, len(page), len(r.Markdown), limit)
+		}
 	}
 }

@@ -254,9 +254,8 @@ func (c *conv) blocks(n *html.Node) []string {
 			flush()
 			switch ch.DataAtom {
 			case atom.H1, atom.H2, atom.H3, atom.H4, atom.H5, atom.H6:
-				level := int(ch.DataAtom-atom.H1) + 1
 				if t := strings.TrimSpace(c.inline(ch)); t != "" {
-					add(strings.Repeat("#", level) + " " + t)
+					add(strings.Repeat("#", headingLevel(ch.DataAtom)) + " " + t)
 				}
 			case atom.Ul, atom.Ol:
 				add(c.list(ch, 0))
@@ -284,6 +283,27 @@ func (c *conv) blocks(n *html.Node) []string {
 	}
 	flush()
 	return out
+}
+
+// headingLevel is the level, 1 to 6, of a heading element. It is a lookup, not
+// arithmetic on the atoms: atom values are hashes, not consecutive numbers, and
+// subtracting them once turned <h2> into 263,425 # marks.
+func headingLevel(a atom.Atom) int {
+	switch a {
+	case atom.H1:
+		return 1
+	case atom.H2:
+		return 2
+	case atom.H3:
+		return 3
+	case atom.H4:
+		return 4
+	case atom.H5:
+		return 5
+	case atom.H6:
+		return 6
+	}
+	return 1
 }
 
 // list renders a ul or ol with nested lists indented under their item.

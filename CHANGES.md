@@ -1,0 +1,53 @@
+# Changes
+
+v0.0.0 is the prototype, a proof of concept: it shows that a terminal browser
+can read the Markdown web and preview a Markdown site. From v0.0.1, if the work
+continues, the development status becomes WIP.
+
+## v0.0.0 — 2026-11-20 (prototype)
+
+### Added
+
+- **Reading the Markdown web.** `cmarkbrowser ADDRESS` fetches a page with BonBon's
+  `Accept: text/markdown, text/x-opml`, removes the front matter and any HTML,
+  fills in `{{page.NAME}}` macros, and shows it in a terminal viewer with
+  numbered links. Tab and Shift-Tab focus a link, Enter or a typed number
+  follows it, `b` and `f` go back and forward, `/` searches with `n` and `N`.
+  `-dump` prints the rendered page and its links.
+- **The next and previous page.** `]` and `[` use a page's `urlNext` and
+  `urlPrev`, else the site's `/.well-known/toc.opml`: the site root first, then
+  the folders down to the page, with same-site includes merged, and the
+  direction of calendar outlines read from their names.
+- **Links that are not pages.** An HTML page with no Markdown copy opens in
+  reader view. XML and text open as source in a block (control characters
+  removed, cut at 1 MB). An image or other file is a note, not downloaded.
+  A link into the HTML site named by `urlMirrorOf` in `bonbon.json` opens the
+  Markdown copy when it exists.
+- **Bookmarks and history.** `m` adds the page to `bookmarks.md` and `B` opens
+  it. Every web page visited is written to `history.md`, newest first, 500
+  kept; `H` opens it, and with no address the browser starts from it.
+  `-no-history` turns it off, `-history FILE` names another file.
+- **`o` opens an address** without leaving the browser.
+- **`e` edits the page** in `$VISUAL` or `$EDITOR`. A local file is edited in
+  place and reloaded afterwards; a remote page is saved as a copy in the
+  Downloads folder and the copy is edited.
+- **Local sites.** `cmarkbrowser ./` browses a folder with no server and no
+  `file://` address. Links are paths inside the site root (`/` is the root);
+  anything that leaves it, by `..` or a symlink, and any `file:` address is
+  refused. `]` and `[` read the folder's `.well-known/toc.opml`. Local pages are
+  not recorded in the history and cannot be bookmarked (DR-0001).
+- **Exit codes** follow workspace DR-0003: 2, 65, 66, 69, 70, 73 and 77.
+- **Documentation** as a Markdown site for BonBon browsers and an HTML website:
+  User Manual, Command Reference, BonBon, INSTALL and About, with
+  `/.well-known/toc.opml` and an `index.md`.
+- **A Makefile and release scripts** for Linux (x86_64, aarch64), macOS
+  (x86_64, arm64) and Windows (x86_64, arm64).
+
+### Known gaps
+
+- There is no `-help index` and no per-topic help pages; the program has one
+  help page and one man page.
+- No configuration file, and `history.md` and `bookmarks.md` live in the folder
+  cmarkbrowser is started from (TODO).
+- Images are not shown, and `urlSearch` in `bonbon.json` is not used.
+- Windows and macOS builds are cross-compiled but have not been run.

@@ -24,7 +24,7 @@ keywords:
   - BonBon
   - Textcasting
 
-
+date_released: 2026-11-20
 ---
 
 About this software
@@ -32,7 +32,7 @@ About this software
 
 ## cmarkbrowser 0.0.0
 
-Not released. Not released. A spike: fetch, strip front matter and HTML, render with glamour, follow numbered links, back and forward.
+v0.0.0 is the prototype, a proof of concept. A terminal browser for the Markdown web (after Dave Winer's BonBon). Opens pages as Markdown with BonBon's Accept header, strips front matter and HTML, numbers and focuses links, back and forward, search, reader view for HTML pages, source for XML and text, notes for images and files. Next and previous page from a page's urlNext and urlPrev or the site's /.well-known/toc.opml (root first), urlMirrorOf link translation from bonbon.json. Bookmarks (bookmarks.md) and history (history.md, on by default, -no-history turns it off), o to open an address, e to edit the page in $VISUAL or $EDITOR. Browses a Markdown folder as a site with no server: cmarkbrowser ./ (cmarkbrowser DR-0001). Documentation is a Markdown site for BonBon browsers as well as an HTML website. Not yet in this prototype: a configuration file, per-platform state folders, images, urlSearch.
 
 ## Authors
 
@@ -66,5 +66,7 @@ A terminal browser for the Markdown web, after Dave Winer's BonBon: it fetches p
 - CMTools >= 0.0.46
 - Pandoc >= 3.1.11
 - GNU Make >= 3
+- jq, zip and the GitHub CLI (gh), to cut a release
+- Bash or PowerShell
 
 

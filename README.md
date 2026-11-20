@@ -16,7 +16,9 @@ sized reader for the same pages, and a way to test what
 
 ## Status
 
-A concept experiment that works and is used: it has not been released.
+v0.0.0 is a prototype, a proof of concept, and it works: you can read the Markdown
+web with it today. From v0.0.1, if development continues, it becomes a work in
+progress (WIP).
 
 - Open a page: `cmarkbrowser https://rsdoiel.github.io/blog/index.md`.
 - Follow links with Tab and Enter, or by number; back, forward, search, bookmarks,

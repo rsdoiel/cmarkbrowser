@@ -20,7 +20,7 @@ MD_PAGES = $(filter-out $(NO_PUBLISH),$(shell ls -1 *.md))
 
 # The order of the table of contents. Every published page must be listed
 # here (the build stops when one is missing), README.md first: it is the home page.
-PAGE_ORDER = README.md user_manual.md command_reference.md bonbon.md INSTALL.md about.md
+PAGE_ORDER = README.md user_manual.md command_reference.md bonbon.md INSTALL.md about.md CHANGES.md
 
 HTML_PAGES = $(patsubst %.md,%.html,$(MD_PAGES))
 

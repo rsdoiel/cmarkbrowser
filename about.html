@@ -16,6 +16,7 @@
     <li><a href="command_reference.html">Command Reference</a></li>
     <li><a href="bonbon.html">BonBon</a></li>
     <li><a href="about.html">About</a></li>
+    <li><a href="CHANGES.html">Changes</a></li>
     <li><a href="INSTALL.html">INSTALL</a></li>
     <li><a href="LICENSE">LICENSE</a></li>
     <li><a href="https://github.com/rsdoiel/cmarkbrowser">Code Repository</a></li>
@@ -24,8 +25,20 @@
 <section id="main-content">
 <h1 id="about-this-software">About this software</h1>
 <h2 id="cmarkbrowser-0.0.0">cmarkbrowser 0.0.0</h2>
-<p>Not released. Not released. A spike: fetch, strip front matter and
-HTML, render with glamour, follow numbered links, back and forward.</p>
+<p>v0.0.0 is the prototype, a proof of concept. A terminal browser for
+the Markdown web (after Dave Winer’s BonBon). Opens pages as Markdown
+with BonBon’s Accept header, strips front matter and HTML, numbers and
+focuses links, back and forward, search, reader view for HTML pages,
+source for XML and text, notes for images and files. Next and previous
+page from a page’s urlNext and urlPrev or the site’s
+/.well-known/toc.opml (root first), urlMirrorOf link translation from
+bonbon.json. Bookmarks (bookmarks.md) and history (history.md, on by
+default, -no-history turns it off), o to open an address, e to edit the
+page in $VISUAL or $EDITOR. Browses a Markdown folder as a site with no
+server: cmarkbrowser ./ (cmarkbrowser DR-0001). Documentation is a
+Markdown site for BonBon browsers as well as an HTML website. Not yet in
+this prototype: a configuration file, per-platform state folders,
+images, urlSearch.</p>
 <h2 id="authors">Authors</h2>
 <ul>
 <li><a href="https://orcid.org/0000-0003-0900-6903">R. S. Doiel</a></li>
@@ -55,6 +68,8 @@ Tracker</a></li>
 <li>CMTools &gt;= 0.0.46</li>
 <li>Pandoc &gt;= 3.1.11</li>
 <li>GNU Make &gt;= 3</li>
+<li>jq, zip and the GitHub CLI (gh), to cut a release</li>
+<li>Bash or PowerShell</li>
 </ul>
 </section>
 <footer>

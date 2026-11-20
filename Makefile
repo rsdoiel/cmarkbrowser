@@ -26,7 +26,7 @@ MAN_PAGES_1 = $(patsubst %.1.md,%.1,$(wildcard *.1.md))
 MAN_PAGES_7 = $(patsubst %.7.md,%.7,$(wildcard *.7.md))
 
 # The Markdown pages that go in a release archive beside the man page sources.
-DOC_PAGES = README.md INSTALL.md user_manual.md bonbon.md command_reference.md about.md
+DOC_PAGES = README.md INSTALL.md CHANGES.md user_manual.md bonbon.md command_reference.md about.md
 
 DOCS = $(wildcard *.?.md)
 

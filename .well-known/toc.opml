@@ -2,7 +2,7 @@
 <opml version="2.0">
 	<head>
 		<title>cmarkbrowser</title>
-		<dateModified>Fri, 20 Nov 2026 06:45:59 -0800</dateModified>
+		<dateModified>Fri, 20 Nov 2026 07:14:27 -0800</dateModified>
 	</head>
 	<body>
 		<outline text="Pages">
@@ -12,6 +12,7 @@
 			<outline text="cmarkbrowser and BonBon" url="https://rsdoiel.github.io/cmarkbrowser/bonbon.md"></outline>
 			<outline text="Installing cmarkbrowser" url="https://rsdoiel.github.io/cmarkbrowser/INSTALL.md"></outline>
 			<outline text="about" url="https://rsdoiel.github.io/cmarkbrowser/about.md"></outline>
+			<outline text="Changes" url="https://rsdoiel.github.io/cmarkbrowser/CHANGES.md"></outline>
 		</outline>
 	</body>
 </opml>

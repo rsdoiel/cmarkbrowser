@@ -1,6 +1,6 @@
-%cmarkbrowser(1) user manual | version 0.0.0 e389822
+%cmarkbrowser(1) user manual | version 0.0.0 faf08ec
 % R. S. Doiel
-% 2026-11-19
+% 2026-11-20
 
 # NAME
 

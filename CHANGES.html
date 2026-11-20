@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="en-US">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>cmarkbrowser</title>
+    <link rel="stylesheet" href="css/site.css">
+    <link rel="alternate" type="text/markdown" href="CHANGES.md">
+</head>
+<body>
+<a href="#main-content" class="visually-hidden">skip to main content</a>
+<nav>
+<ul>
+    <li><a href="index.html">Home</a></li>
+    <li><a href="user_manual.html">User Manual</a></li>
+    <li><a href="command_reference.html">Command Reference</a></li>
+    <li><a href="bonbon.html">BonBon</a></li>
+    <li><a href="about.html">About</a></li>
+    <li><a href="CHANGES.html">Changes</a></li>
+    <li><a href="INSTALL.html">INSTALL</a></li>
+    <li><a href="LICENSE">LICENSE</a></li>
+    <li><a href="https://github.com/rsdoiel/cmarkbrowser">Code Repository</a></li>
+</ul>
+</nav>
+<section id="main-content">
+<h1 id="changes">Changes</h1>
+<p>v0.0.0 is the prototype, a proof of concept: it shows that a terminal
+browser can read the Markdown web and preview a Markdown site. From
+v0.0.1, if the work continues, the development status becomes WIP.</p>
+<h2 id="v0.0.0-2026-11-20-prototype">v0.0.0 — 2026-11-20
+(prototype)</h2>
+<h3 id="added">Added</h3>
+<ul>
+<li><strong>Reading the Markdown web.</strong>
+<code>cmarkbrowser ADDRESS</code> fetches a page with BonBon’s
+<code>Accept: text/markdown, text/x-opml</code>, removes the front
+matter and any HTML, fills in <code>{{page.NAME}}</code> macros, and
+shows it in a terminal viewer with numbered links. Tab and Shift-Tab
+focus a link, Enter or a typed number follows it, <code>b</code> and
+<code>f</code> go back and forward, <code>/</code> searches with
+<code>n</code> and <code>N</code>. <code>-dump</code> prints the
+rendered page and its links.</li>
+<li><strong>The next and previous page.</strong> <code>]</code> and
+<code>[</code> use a page’s <code>urlNext</code> and
+<code>urlPrev</code>, else the site’s
+<code>/.well-known/toc.opml</code>: the site root first, then the
+folders down to the page, with same-site includes merged, and the
+direction of calendar outlines read from their names.</li>
+<li><strong>Links that are not pages.</strong> An HTML page with no
+Markdown copy opens in reader view. XML and text open as source in a
+block (control characters removed, cut at 1 MB). An image or other file
+is a note, not downloaded. A link into the HTML site named by
+<code>urlMirrorOf</code> in <code>bonbon.json</code> opens the Markdown
+copy when it exists.</li>
+<li><strong>Bookmarks and history.</strong> <code>m</code> adds the page
+to <code>bookmarks.md</code> and <code>B</code> opens it. Every web page
+visited is written to <code>history.md</code>, newest first, 500 kept;
+<code>H</code> opens it, and with no address the browser starts from it.
+<code>-no-history</code> turns it off, <code>-history FILE</code> names
+another file.</li>
+<li><strong><code>o</code> opens an address</strong> without leaving the
+browser.</li>
+<li><strong><code>e</code> edits the page</strong> in
+<code>$VISUAL</code> or <code>$EDITOR</code>. A local file is edited in
+place and reloaded afterwards; a remote page is saved as a copy in the
+Downloads folder and the copy is edited.</li>
+<li><strong>Local sites.</strong> <code>cmarkbrowser ./</code> browses a
+folder with no server and no <code>file://</code> address. Links are
+paths inside the site root (<code>/</code> is the root); anything that
+leaves it, by <code>..</code> or a symlink, and any <code>file:</code>
+address is refused. <code>]</code> and <code>[</code> read the folder’s
+<code>.well-known/toc.opml</code>. Local pages are not recorded in the
+history and cannot be bookmarked (DR-0001).</li>
+<li><strong>Exit codes</strong> follow workspace DR-0003: 2, 65, 66, 69,
+70, 73 and 77.</li>
+<li><strong>Documentation</strong> as a Markdown site for BonBon
+browsers and an HTML website: User Manual, Command Reference, BonBon,
+INSTALL and About, with <code>/.well-known/toc.opml</code> and an
+<code>index.md</code>.</li>
+<li><strong>A Makefile and release scripts</strong> for Linux (x86_64,
+aarch64), macOS (x86_64, arm64) and Windows (x86_64, arm64).</li>
+</ul>
+<h3 id="known-gaps">Known gaps</h3>
+<ul>
+<li>There is no <code>-help index</code> and no per-topic help pages;
+the program has one help page and one man page.</li>
+<li>No configuration file, and <code>history.md</code> and
+<code>bookmarks.md</code> live in the folder cmarkbrowser is started
+from (TODO).</li>
+<li>Images are not shown, and <code>urlSearch</code> in
+<code>bonbon.json</code> is not used.</li>
+<li>Windows and macOS builds are cross-compiled but have not been
+run.</li>
+</ul>
+</section>
+<footer>
+<p>cmarkbrowser, a terminal browser for the Markdown web. This page is also published as <a href="CHANGES.md">Markdown</a>.</p>
+</footer>
+</body>
+</html>

@@ -67,6 +67,10 @@ https://rsdoiel.github.io/blog/index.md and https://rsdoiel.github.io/antenna/in
 - [ ] Reader view limits to look at: pages whose text is built by JavaScript show an error, not content; tables are plain pipe tables; no `<picture>` or `srcset`; a page behind a login or a consent wall is shown as that wall. A `[image: alt]` line for body pictures is still open (see Images).
 - [ ] XML, OPML, JSON and plain text links: show as source text (BonBon's rule); images: say what they are.
 
+## Content-Location (2026-11-19)
+
+- [ ] Honor `Content-Location` (BonBon does, and the preview server now sends it: antennaApp DR-0010). Today a page's address is the one asked for, so when a server answers an HTML address with Markdown from another file, the address shown, a bookmark, and the base that relative links resolve against are all the HTML's; if the Markdown lives in another folder (`sub/page.html` declaring `../other/items.md`) its relative links resolve wrongly. Use the header, resolved against the request address and limited to the same host, as the page's address in `page.fetchAttempt`.
+
 ## Browsing
 
 - [ ] Fetch a page with `Accept: text/markdown, text/x-opml`. A page is `text/markdown`, or `text/plain` or a generic binary type with a `.md` or `.markdown` path. HTML and XML show as source; images are not shown at first.
@@ -83,3 +87,11 @@ https://rsdoiel.github.io/blog/index.md and https://rsdoiel.github.io/antenna/in
 - [ ] Is a bookmarks file wanted, and where does it live? (No global settings files in the workspace; configuration may have to be a file in the working directory.)
 - [ ] Images: show nothing, show alt text, or use a terminal graphics protocol later.
 - [ ] Should it be a TUI only, or also print a rendered page to standard output for use in pipes (`cmarkbrowser -dump URL`)?
+
+## Someday, Maybe features
+
+- [ ] Render Fountain files as well as Markdown files
+- [ ] Add Gopher support to cmarkbrowser
+- [ ] Add ftp/sftp support to cmarkbrowser
+- [ ] Turn cmarkbrowser into a module so it can be embedded in other apps like foulpapers for reading Markdown and fountain documents
+

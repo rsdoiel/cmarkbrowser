@@ -25,7 +25,7 @@ A concept experiment that works and is used: it has not been released.
 - Edit the page you are reading in your own editor with `e`.
 
 The [User Manual](user_manual.md) says how, the
-[Command Reference](cmarkbrowser.1.md) lists every key and option, and
+[Command Reference](command_reference.md) lists every key and option, and
 [BonBon](bonbon.md) says how cmarkbrowser and BonBon differ.
 
 ## This documentation is a Markdown site too

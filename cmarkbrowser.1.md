@@ -1,13 +1,12 @@
-# cmarkbrowser command reference
+%cmarkbrowser(1) user manual | version 0.0.0 e389822
+% R. S. Doiel
+% 2026-11-19
 
-This page is written by `cmarkbrowser -help`.
-
-
-## NAME
+# NAME
 
 cmarkbrowser — a terminal browser for the Markdown web
 
-## SYNOPSIS
+# SYNOPSIS
 
 cmarkbrowser [OPTIONS] [URL|PATH]
 
@@ -15,7 +14,7 @@ cmarkbrowser [-history FILE | -no-history]
 
 cmarkbrowser -dump [-style NAME] [-width N] [-debug FILE] URL|PATH
 
-## DESCRIPTION
+# DESCRIPTION
 
 cmarkbrowser fetches a page as Markdown, shows it in the terminal and follows
 its links. It is modelled on Dave Winer's BonBon: HTML in a page is stripped,
@@ -104,7 +103,7 @@ In a local site the same rules go by the file's extension.
 A link to an HTML page that has no Markdown copy is shown in reader view: its
 text, links and pictures that have alt text, without scripts, styles or menus.
 
-## OPTIONS
+# OPTIONS
 
 -h, -help
 : Show this help.
@@ -144,7 +143,7 @@ text, links and pictures that have alt text, without scripts, styles or menus.
 -v, -version
 : Show the version.
 
-## EXIT STATUS
+# EXIT STATUS
 
 0
 : Success.

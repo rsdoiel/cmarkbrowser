@@ -24,7 +24,7 @@ import (
 // built site reads in cmarkbrowser itself.
 
 // noPublish are the Markdown files that are not website pages.
-var noPublish = map[string]bool{"TODO.md": true, "index.md": true}
+var noPublish = map[string]bool{"TODO.md": true, "index.md": true, "cmarkbrowser.1.md": true}
 
 // pageOrder is PAGE_ORDER from website.mak.
 func pageOrder(t *testing.T) []string {
@@ -90,7 +90,7 @@ func TestPagesLinkToEachOtherAsMarkdown(t *testing.T) {
 }
 
 func TestTheCommandReferenceIsTheProgramsOwnHelp(t *testing.T) {
-	got, err := os.ReadFile("cmarkbrowser.1.md")
+	got, err := os.ReadFile("command_reference.md")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -100,7 +100,7 @@ func TestTheCommandReferenceIsTheProgramsOwnHelp(t *testing.T) {
 	body = regexp.MustCompile(`(?m)^# `).ReplaceAllString(body, "## ")
 	want := "# cmarkbrowser command reference\n\nThis page is written by `cmarkbrowser -help`.\n\n" + body
 	if strings.TrimRight(string(got), "\n") != strings.TrimRight(want, "\n") {
-		t.Error("cmarkbrowser.1.md is out of date with the program's help: run `make docs`")
+		t.Error("command_reference.md is out of date with the program's help: run `make docs`")
 	}
 }
 

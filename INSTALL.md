@@ -1,7 +1,10 @@
 # Installing cmarkbrowser
 
 cmarkbrowser is a single program written in Go. There is no release yet, so you
-build it from the source.
+build it from the source. Releases, when there are some, are zip files on the
+[releases page](https://github.com/rsdoiel/cmarkbrowser/releases) for Linux
+(x86_64 and aarch64, which includes the Raspberry Pi), macOS (x86_64 and arm64)
+and Windows (x86_64 and arm64): unzip one and put `bin/cmarkbrowser` on your PATH.
 
 ## Requirements
 

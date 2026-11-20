@@ -1,7 +1,7 @@
 # cmarkbrowser User Manual
 
 cmarkbrowser reads the Markdown web in a terminal. This page is how to use it;
-the [Command Reference](cmarkbrowser.1.md) lists every key and option. Run it
+the [Command Reference](command_reference.md) lists every key and option. Run it
 with an address or a path:
 
 ~~~shell

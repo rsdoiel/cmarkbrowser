@@ -6,6 +6,7 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 	"github.com/rsdoiel/cmarkbrowser/internal/debuglog"
+	"github.com/rsdoiel/cmarkbrowser/internal/local"
 	"github.com/rsdoiel/cmarkbrowser/internal/toc"
 )
 
@@ -13,9 +14,10 @@ import (
 // question was asked about, so an answer that arrives after the person has
 // moved on can be dropped; dir is +1 for next and -1 for previous.
 type tocMsg struct {
-	page string
-	dir  int
-	res  toc.Result
+	page  string
+	dir   int
+	res   toc.Result
+	local bool // the answer is for a local page: Prev and Next are paths
 }
 
 // tocTimeout bounds one lookup: a few probes and any includes.
@@ -24,17 +26,24 @@ const tocTimeout = 30 * time.Second
 // canLookUpTOC reports whether the page being shown can have a table of
 // contents: a page of the Markdown web, fetched from a web address.
 func (m Model) canLookUpTOC() bool {
-	return m.toc != nil && m.view != nil && !m.view.Page.Reader && !isFileAddr(m.view.Page.URL)
+	if m.toc == nil || m.view == nil || m.view.Page.Reader {
+		return false
+	}
+	return !isFileAddr(m.view.Page.URL) || m.view.Site != nil // a local page has a table of contents only inside a site root
 }
 
 // lookupTOC asks the site's table of contents what comes before (dir -1) or
 // after (dir +1) the page being shown. The reading is done in the background
 // and the answer comes back as a tocMsg.
 func (m Model) lookupTOC(dir int) tea.Cmd {
-	page, finder, log := m.view.Page.URL, m.toc, m.log
+	page, finder, log, site := m.view.Page.URL, m.toc, m.log, m.view.Site
 	return func() tea.Msg {
 		ctx, cancel := context.WithTimeout(debuglog.WithContext(context.Background(), log), tocTimeout)
 		defer cancel()
+		if site != nil {
+			p, _ := local.PathOf(page)
+			return tocMsg{page: page, dir: dir, res: finder.LookupLocal(ctx, site.Root, p), local: true}
+		}
 		return tocMsg{page: page, dir: dir, res: finder.Lookup(ctx, page)}
 	}
 }
@@ -58,6 +67,15 @@ func (m Model) tocAnswered(msg tocMsg) (tea.Model, tea.Cmd) {
 	case target == "":
 		m.status = none
 		return m, nil
+	}
+	if msg.local {
+		// a path the outline named, kept inside the site root like any path link
+		real, err := m.view.Site.Inside(target)
+		if err != nil {
+			m.status = "outside the site root, not opened: " + target
+			return m, nil
+		}
+		return m.openLocal(real, why)
 	}
 	m.busy, m.status = true, "loading "+target
 	return m, m.load(target, -1, why)

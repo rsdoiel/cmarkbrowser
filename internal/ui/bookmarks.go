@@ -3,6 +3,7 @@ package ui
 import (
 	"errors"
 	"fmt"
+	"github.com/rsdoiel/cmarkbrowser/internal/local"
 	"net/url"
 	"os"
 	"path/filepath"
@@ -71,10 +72,22 @@ func (m Model) loadFile(path string, idx int, why string) tea.Cmd {
 		m.localOK[addr] = true
 	}
 	r, width, log := m.r, m.width(), m.log
-	log.Event("load.start", "addr", addr, "idx", idx, "why", why)
+	// A page opened inside the site root has a site: its links are paths. The
+	// bookmarks and history files, and anything else, have none (DR-0001).
+	var site *local.Site
+	if m.site != nil && m.rooted[addr] {
+		site = m.site
+	}
+	log.Event("load.start", "addr", addr, "idx", idx, "why", why, "rooted", site != nil)
 	return func() tea.Msg {
 		t0 := time.Now()
-		v, err := browse.OpenFile(contextWith(log), abs, r, width)
+		var v *browse.View
+		var err error
+		if site != nil {
+			v, err = browse.OpenLocal(contextWith(log), abs, site, r, width)
+		} else {
+			v, err = browse.OpenFile(contextWith(log), abs, r, width)
+		}
 		return loadMsg{v: v, err: err, addr: addr, idx: idx, took: time.Since(t0)}
 	}
 }

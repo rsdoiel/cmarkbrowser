@@ -17,11 +17,11 @@ const HelpText = `%{app_name}(1) user manual | version {version} {release_hash}
 
 # SYNOPSIS
 
-{app_name} [OPTIONS] [URL|FILE]
+{app_name} [OPTIONS] [URL|PATH]
 
 {app_name} [-history FILE | -no-history]
 
-{app_name} -dump [-style NAME] [-width N] [-debug FILE] URL|FILE
+{app_name} -dump [-style NAME] [-width N] [-debug FILE] URL|PATH
 
 # DESCRIPTION
 
@@ -73,9 +73,23 @@ line {app_name} starts from it, so you can click to where you left off. The file
 is rewritten by {app_name}; keep notes elsewhere. -no-history records nothing;
 -dump never records. The session history (b and f) is kept in memory either way.
 
-Given a file name instead of an address, {app_name} shows that file. Local
-files are opened only that way, and through B: a link in a page, whatever it
-says, never opens one.
+Given a path instead of an address, {app_name} browses a site on your own file
+system, with no web server and no protocol: {app_name} ./ browses the current
+folder, starting at its index.md; a Markdown file starts at that file. The
+site root is the folder you gave (for a file, the nearest folder above it with
+a .well-known/toc.opml, else its own folder). A link in a page is a path:
+b.md is next to the page, ../c.md is above it, and /d.md is relative to the site
+root, as on the web; a link to x.html opens x.md when there is one. Links to
+http:// and https:// addresses go to the web as usual. A link that would leave
+the site root, by .. or through a symlink, is refused, and so is any file:
+address, in any page: nothing a page says can read a file outside the folder
+you named. ] and [ use the site's .well-known/toc.opml read from the folder
+(its addresses match by path, so a site not yet published works). The point is
+to preview a site and edit it: local pages are never recorded in the history
+file and cannot be bookmarked. A directory with no index.md is exit 66; a
+file: address on the command line is a usage error.
+
+Local files are otherwise opened only through B and H, never from a link.
 
 A link to an HTML page that has no Markdown copy is shown in reader view: its
 text, links and pictures that have alt text, without scripts, styles or menus.
@@ -130,10 +144,11 @@ text, links and pictures that have alt text, without scripts, styles or menus.
 
 65
 : The page is not Markdown (and not HTML), its front matter is not valid, or
-  the file named is a directory or not text.
+  the file named is not text.
 
 66
-: The page is not there (404 or 410), or the file named does not exist.
+: The page is not there (404 or 410), the path named does not exist, or the
+  directory named has no index.md.
 
 69
 : The server cannot be reached.
@@ -143,4 +158,7 @@ text, links and pictures that have alt text, without scripts, styles or menus.
 
 73
 : The -debug file cannot be created.
+
+77
+: The operating system refused access to the path named.
 `

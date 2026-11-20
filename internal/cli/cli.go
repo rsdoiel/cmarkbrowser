@@ -4,6 +4,7 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	localpkg "github.com/rsdoiel/cmarkbrowser/internal/local"
 	"io"
 	"os"
 	"runtime"
@@ -15,7 +16,6 @@ import (
 	cmarkbrowser "github.com/rsdoiel/cmarkbrowser"
 	"github.com/rsdoiel/cmarkbrowser/internal/browse"
 	"github.com/rsdoiel/cmarkbrowser/internal/debuglog"
-	"github.com/rsdoiel/cmarkbrowser/internal/page"
 	"github.com/rsdoiel/cmarkbrowser/internal/render"
 	"github.com/rsdoiel/cmarkbrowser/internal/ui"
 )
@@ -92,6 +92,7 @@ func Run(args []string, stdout, stderr io.Writer) int {
 	}
 	// With no URL the browser starts from the history file, when there is one.
 	start := fs.Arg(0)
+	fromHistory := false
 	if !dump && fs.NArg() == 0 {
 		if historyPath == "" {
 			return fail(stderr, fmt.Errorf("%w: a URL is needed (try -help)", ErrUsage))
@@ -99,7 +100,7 @@ func Run(args []string, stdout, stderr io.Writer) int {
 		if _, err := os.Stat(historyPath); err != nil {
 			return fail(stderr, fmt.Errorf("%w: a URL is needed: there is no history yet in %s (try -help)", ErrUsage, historyPath))
 		}
-		start = historyPath
+		start, fromHistory = historyPath, true
 	}
 	if !dump && !isTerminal(stdout) {
 		return fail(stderr, fmt.Errorf("%w: the browser needs a terminal; use -dump to print a page", ErrUsage))
@@ -121,22 +122,36 @@ func Run(args []string, stdout, stderr io.Writer) int {
 		log.Event("start", "schema", 1, "version", cmarkbrowser.Version, "hash", cmarkbrowser.ReleaseHash,
 			"mode", mode, "args", args, "goos", runtime.GOOS, "goarch", runtime.GOARCH, "pid", os.Getpid())
 	}
-	// An argument with no scheme is a file the person named; an address needs
-	// http:// or https://. Links never open files (page.Fetch refuses them).
-	local := !strings.Contains(start, "://")
+	// A file: address is not a path, and there is no protocol for a local site
+	// (DR-0001): the argument is a path, or an http:// or https:// address.
+	if strings.HasPrefix(strings.ToLower(strings.TrimSpace(start)), "file:") {
+		return fail(stderr, fmt.Errorf("%w: %s: give a path (./ for this folder), not a file: address", ErrUsage, start))
+	}
+	// An argument with no scheme is a path the person named; an address needs
+	// http:// or https://. A page's own links never open files outside the site
+	// root they name (page.Fetch refuses them).
+	isPath := !strings.Contains(start, "://")
+	var site *localpkg.Site
+	if isPath && !fromHistory { // the history file is a page of its own, with no site root
+		var err error
+		site, start, err = localpkg.Open(start)
+		if err != nil {
+			code := fail(stderr, err)
+			log.Event("exit", "code", code)
+			return code
+		}
+	}
 	var code int
 	if dump {
 		ctx := debuglog.WithContext(context.Background(), log)
-		code = runDump(ctx, fs.Arg(0), local, render.Glamour{Style: style}, width, stdout, stderr)
+		code = runDump(ctx, start, site, render.Glamour{Style: style}, width, stdout, stderr)
 	} else {
 		model := ui.New(start, render.Glamour{Style: style}).WithDebug(log).WithBookmarks(bookmarksPath).WithHistory(historyPath)
-		if local {
-			if _, err := os.Stat(start); err != nil {
-				code = fail(stderr, fmt.Errorf("%w: %s (an address starts with http:// or https://)", page.ErrNoInput, err))
-				log.Event("exit", "code", code)
-				return code
-			}
+		if isPath {
 			model = model.WithLocalStart()
+			if site != nil {
+				model = model.WithSite(site)
+			}
 		}
 		if _, err := tea.NewProgram(model).Run(); err != nil {
 			code = fail(stderr, err)
@@ -148,11 +163,11 @@ func Run(args []string, stdout, stderr io.Writer) int {
 
 // runDump prints a rendered page, then its numbered links. A local file is
 // read only when the person named it on the command line.
-func runDump(ctx context.Context, arg string, local bool, r render.Renderer, width int, stdout, stderr io.Writer) int {
+func runDump(ctx context.Context, arg string, site *localpkg.Site, r render.Renderer, width int, stdout, stderr io.Writer) int {
 	var v *browse.View
 	var err error
-	if local {
-		v, err = browse.OpenFile(ctx, arg, r, width)
+	if site != nil {
+		v, err = browse.OpenLocal(ctx, arg, site, r, width)
 	} else {
 		v, err = browse.Open(ctx, arg, r, width)
 	}
@@ -169,7 +184,11 @@ func runDump(ctx context.Context, arg string, local bool, r render.Renderer, wid
 	if len(v.Links) > 0 {
 		fmt.Fprintln(stdout, "\nLinks:")
 		for _, l := range v.Links {
-			fmt.Fprintf(stdout, "[%d] %s\n", l.N, l.URL)
+			dest := l.URL
+			if l.Path != "" {
+				dest = l.Path // a local page's path link is shown as the path (DR-0001)
+			}
+			fmt.Fprintf(stdout, "[%d] %s\n", l.N, dest)
 		}
 	}
 	return ExitOK

@@ -235,7 +235,7 @@ func Fetch(ctx context.Context, rawurl string) (*Page, error) {
 			}
 		}
 	}
-	sib := markdownSibling(rawurl)
+	sib := MarkdownSibling(rawurl)
 	log.Event("fetch.sibling", "candidate", sib)
 	if sib == "" {
 		return done(nil, "none", err)
@@ -246,9 +246,21 @@ func Fetch(ctx context.Context, rawurl string) (*Page, error) {
 	return done(nil, "none", err)
 }
 
-// markdownSibling returns the address of the Markdown copy of an HTML page or
-// directory address, or "" when the address is neither.
-func markdownSibling(rawurl string) string {
+/** MarkdownSibling returns the address of the Markdown copy of an HTML page or
+ * directory address (a.html to a.md, a directory or a bare site address to its
+ * index.md), or "" when the address is neither. It works on the path of any
+ * address, so local pages use the same rule as the web (cmarkbrowser DR-0001).
+ *
+ * Parameters:
+ *   rawurl (string) — an address
+ *
+ * Returns:
+ *   string — the Markdown copy's address, fragment dropped, or ""
+ *
+ * Example:
+ *   page.MarkdownSibling("https://x.org/a.html") // "https://x.org/a.md"
+ */
+func MarkdownSibling(rawurl string) string {
 	u, err := url.Parse(rawurl)
 	if err != nil {
 		return ""
@@ -616,7 +628,7 @@ func ReadFile(path string) (*Page, error) {
 	}
 	f, err := os.Open(abs)
 	if err != nil {
-		return nil, fmt.Errorf("%w: %s", ErrNoInput, err)
+		return nil, fmt.Errorf("%w: %w", ErrNoInput, err) // errors.Is(err, fs.ErrPermission) still works
 	}
 	defer f.Close()
 	info, err := f.Stat()

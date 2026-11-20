@@ -4,6 +4,7 @@ package browse
 import (
 	"context"
 	"fmt"
+	"github.com/rsdoiel/cmarkbrowser/internal/local"
 	"net/url"
 	"regexp"
 	"strconv"
@@ -26,6 +27,10 @@ type Link struct {
 	N    int
 	Text string
 	URL  string
+	// Path is set for a path link in a local page (DR-0001): the absolute file
+	// it names, which may be outside the site root; the browser checks that
+	// when the link is followed. URL is then its file: address, internal only.
+	Path string
 }
 
 /** View is a page ready to show.
@@ -38,6 +43,9 @@ type Link struct {
  *   Links ([]Link) — the numbered links, in reading order
  *   Missing ([]string) — {{page.KEY}} macros left in the text because the
  *     front matter has no such value
+ *   Site (*local.Site) — the site root when the page is a local page of a site
+ *     the person opened (OpenLocal); nil for a web page and for files such as
+ *     the bookmarks file, whose links are never paths
  */
 type View struct {
 	Page    *page.Page
@@ -45,6 +53,7 @@ type View struct {
 	Text    string
 	Links   []Link
 	Missing []string
+	Site    *local.Site
 
 	lines map[int]int // link number -> line of its marker in Text
 	log   *debuglog.Logger
@@ -101,7 +110,7 @@ func Open(ctx context.Context, addr string, r render.Renderer, width int) (*View
 	if err != nil {
 		return nil, err
 	}
-	return build(ctx, addr, p, r, width, t0)
+	return build(ctx, addr, p, nil, r, width, t0)
 }
 
 /** OpenFile shows a local Markdown file the way Open shows a page. It is only
@@ -127,12 +136,41 @@ func OpenFile(ctx context.Context, path string, r render.Renderer, width int) (*
 	if err != nil {
 		return nil, err
 	}
-	return build(ctx, path, p, r, width, t0)
+	return build(ctx, path, p, nil, r, width, t0)
+}
+
+/** OpenLocal shows a page of a local site (DR-0001): a file inside the site
+ * root, read the way OpenFile reads one, with its links resolved as paths
+ * relative to the page, or to the site root when they start with "/". It is
+ * for the start page and for links the person follows inside the root; the
+ * caller checks the root first.
+ *
+ * Parameters:
+ *   ctx (context.Context) — carries the debug logger
+ *   path (string) — the file, absolute
+ *   site (*local.Site) — the site root
+ *   r (render.Renderer) — the renderer
+ *   width (int) — columns to wrap to
+ *
+ * Returns:
+ *   *View — the page ready to show, with Site set
+ *   error — from page.ReadFile, or the renderer
+ *
+ * Example:
+ *   v, err := browse.OpenLocal(ctx, "/site/index.md", site, render.Glamour{}, 80)
+ */
+func OpenLocal(ctx context.Context, path string, site *local.Site, r render.Renderer, width int) (*View, error) {
+	t0 := time.Now()
+	p, err := page.ReadFile(path)
+	if err != nil {
+		return nil, err
+	}
+	return build(ctx, path, p, site, r, width, t0)
 }
 
 // build expands, prepares and renders a fetched page and numbers its links. t0
 // is when fetching began, for the debug log.
-func build(ctx context.Context, addr string, p *page.Page, r render.Renderer, width int, t0 time.Time) (*View, error) {
+func build(ctx context.Context, addr string, p *page.Page, site *local.Site, r render.Renderer, width int, t0 time.Time) (*View, error) {
 	log := debuglog.FromContext(ctx)
 	t1 := time.Now()
 	body, missing := p.Body, []string(nil)
@@ -147,9 +185,27 @@ func build(ctx context.Context, addr string, p *page.Page, r render.Renderer, wi
 		return nil, fmt.Errorf("rendering %s: %w", addr, err)
 	}
 	t4 := time.Now()
-	v := &View{Page: p, Clean: clean, Text: text, Missing: missing, log: log}
+	v := &View{Page: p, Clean: clean, Text: text, Missing: missing, Site: site, log: log}
 	v.index()
 	for _, l := range links {
+		if site != nil {
+			// A link in a local page is a path, or a web address; anything else
+			// (a file: address too) stays in the text but is not followable.
+			pagePath, _ := local.PathOf(p.URL)
+			ll, err := site.ResolveLink(pagePath, l.Dest)
+			switch {
+			case err != nil:
+				// kept, so that following it can say it is refused
+				if strings.HasPrefix(strings.ToLower(strings.TrimSpace(l.Dest)), "file:") {
+					v.Links = append(v.Links, Link{N: l.N, Text: l.Text, URL: strings.TrimSpace(l.Dest)})
+				}
+			case ll.URL != "":
+				v.Links = append(v.Links, Link{N: l.N, Text: l.Text, URL: ll.URL})
+			default:
+				v.Links = append(v.Links, Link{N: l.N, Text: l.Text, URL: local.Address(ll.Path), Path: ll.Path})
+			}
+			continue
+		}
 		// A link that cannot be resolved stays in the text but is not followable.
 		u, err := Resolve(p.URL, l.Dest)
 		if err != nil {

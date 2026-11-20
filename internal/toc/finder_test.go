@@ -5,6 +5,8 @@ import (
 	"context"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"strings"
 	"sync"
 	"testing"
@@ -230,5 +232,103 @@ func TestTheRootIsAlwaysProbedEvenForAVeryDeepPage(t *testing.T) {
 	c := candidates("http://h.example/a/b/c/d/e/f/g/h/page.md")
 	if len(c) != maxProbes || c[0] != "http://h.example/.well-known/toc.opml" || c[1] != "http://h.example/a/b/c/d/e/f/g/h/.well-known/toc.opml" {
 		t.Errorf("%v", c)
+	}
+}
+
+// localSite writes files under a temp folder and returns its real path.
+func localSite(t *testing.T, files map[string]string) string {
+	t.Helper()
+	dir := t.TempDir()
+	for name, body := range files {
+		p := filepath.Join(dir, filepath.FromSlash(name))
+		os.MkdirAll(filepath.Dir(p), 0o755)
+		if err := os.WriteFile(p, []byte(body), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	real, _ := filepath.EvalSymlinks(dir)
+	return real
+}
+
+func TestALocalPageIsFoundByTheTailOfItsPathWhateverTheOriginsName(t *testing.T) {
+	root := localSite(t, map[string]string{
+		".well-known/toc.opml": opmlWith(
+			entry("http://harvey.local:8010/blog/a.md"), entry("http://harvey.local:8010/blog/b.md"), entry("http://harvey.local:8010/blog/c.md")),
+		"blog/a.md": "# a", "blog/b.md": "# b", "blog/c.md": "# c",
+	})
+	r := NewFinder().LookupLocal(context.Background(), root, filepath.Join(root, "blog", "b.md"))
+	if !r.Found || r.Prev != filepath.Join(root, "blog", "a.md") || r.Next != filepath.Join(root, "blog", "c.md") {
+		t.Errorf("%+v", r)
+	}
+}
+
+func TestALocalSitePublishedUnderASubFolderStillMatches(t *testing.T) {
+	root := localSite(t, map[string]string{
+		".well-known/toc.opml": opmlWith(entry("https://h.example/antenna/a.md"), entry("https://h.example/antenna/b.md")),
+		"a.md":                 "# a", "b.md": "# b",
+	})
+	r := NewFinder().LookupLocal(context.Background(), root, filepath.Join(root, "a.md"))
+	if !r.Found || r.Next != filepath.Join(root, "b.md") || r.Prev != "" {
+		t.Errorf("%+v", r)
+	}
+}
+
+func TestALocalNeighbourThatHasNoFileIsDropped(t *testing.T) {
+	root := localSite(t, map[string]string{
+		".well-known/toc.opml": opmlWith(entry("http://h/a.md"), entry("http://h/gone.md")),
+		"a.md":                 "# a",
+	})
+	r := NewFinder().LookupLocal(context.Background(), root, filepath.Join(root, "a.md"))
+	if !r.Found || r.Next != "" {
+		t.Errorf("%+v", r)
+	}
+}
+
+func TestLocalIncludesAreReadFromFilesUnderTheRootAndNothingIsFetched(t *testing.T) {
+	root := localSite(t, map[string]string{
+		".well-known/toc.opml":   `<opml version="2.0"><body><outline text="s" type="include" url="http://h.example/s/.well-known/toc.opml"/></body></opml>`,
+		"s/.well-known/toc.opml": opmlWith(entry("http://h.example/s/x.md"), entry("http://h.example/s/y.md")),
+		"s/x.md":                 "# x", "s/y.md": "# y",
+	})
+	r := NewFinder().LookupLocal(context.Background(), root, filepath.Join(root, "s", "x.md"))
+	if !r.Found || r.Next != filepath.Join(root, "s", "y.md") {
+		t.Errorf("%+v", r)
+	}
+}
+
+func TestALocalLookupDoesNotLeaveTheRoot(t *testing.T) {
+	outer := localSite(t, map[string]string{
+		"secret/.well-known/toc.opml": opmlWith(entry("http://h/s/a.md"), entry("http://h/s/b.md")),
+		"site/a.md":                   "# a",
+	})
+	root := filepath.Join(outer, "site")
+	// the outline lists a page whose only file is outside the root; and a page outside the root asks nothing
+	if r := NewFinder().LookupLocal(context.Background(), root, filepath.Join(outer, "secret", "a.md")); r.Found {
+		t.Errorf("a page outside the root: %+v", r)
+	}
+	os.WriteFile(filepath.Join(outer, "site", "x"), nil, 0o644)
+	os.MkdirAll(filepath.Join(root, ".well-known"), 0o755)
+	os.Symlink(filepath.Join(outer, "secret", ".well-known", "toc.opml"), filepath.Join(root, ".well-known", "toc.opml"))
+	if r := NewFinder().LookupLocal(context.Background(), root, filepath.Join(root, "a.md")); r.Found {
+		t.Errorf("a symlinked outline outside the root was read: %+v", r)
+	}
+}
+
+func TestANonLocalNeighboursByPathHandlesIndexAndHTML(t *testing.T) {
+	d, err := Parse([]byte(opmlWith(entry("http://h/a.md"), entry("http://h/dir/"), entry("http://h/c.html"))), "http://h/")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, next, ok := d.NeighboursByPath("a.md"); !ok || next != "http://h/dir/" {
+		t.Errorf("%q %v", next, ok)
+	}
+	if prev, _, ok := d.NeighboursByPath("c.md"); !ok || prev != "http://h/dir/" {
+		t.Errorf("an .html entry matches its .md: %q %v", prev, ok)
+	}
+	if _, _, ok := d.NeighboursByPath("dir/index.md"); !ok {
+		t.Error("a folder entry matches its index.md")
+	}
+	if _, _, ok := d.NeighboursByPath("xa.md"); ok {
+		t.Error("a name that only ends alike matched")
 	}
 }

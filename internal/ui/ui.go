@@ -5,6 +5,8 @@ package ui
 import (
 	"context"
 	"fmt"
+	"github.com/rsdoiel/cmarkbrowser/internal/local"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -78,6 +80,8 @@ type Model struct {
 	bmPath     string          // the bookmarks file, "" for bookmarks.md
 	localStart bool            // the start argument is a file the person named
 	localOK    map[string]bool // file addresses the person opened; a link never adds to it
+	site       *local.Site     // the site root the person opened a local site at (DR-0001), nil for none
+	rooted     map[string]bool // local pages opened inside the site root, so their links are paths
 }
 
 /** New returns a browser that opens start when it runs.
@@ -93,7 +97,7 @@ type Model struct {
  *   m := ui.New("https://x.org/a.md", render.Glamour{Style: "dark"})
  */
 func New(start string, r render.Renderer) Model {
-	return Model{r: r, start: start, idx: -1, w: 80, h: 24, localOK: map[string]bool{}, toc: toc.NewFinder(), vp: viewport.New(viewport.WithWidth(80), viewport.WithHeight(22))}
+	return Model{r: r, start: start, idx: -1, w: 80, h: 24, localOK: map[string]bool{}, rooted: map[string]bool{}, toc: toc.NewFinder(), vp: viewport.New(viewport.WithWidth(80), viewport.WithHeight(22))}
 }
 
 /** WithDebug returns the browser with a debug logger: every key, load, status
@@ -120,6 +124,15 @@ func (m Model) width() int { return min(max(m.w, 20), maxWidth) }
 // Init loads the start page.
 func (m Model) Init() tea.Cmd {
 	if m.localStart {
+		if m.site != nil {
+			abs, err := filepath.Abs(m.start)
+			if err != nil {
+				abs = m.start
+			}
+			if _, err := m.site.Inside(abs); err == nil {
+				m.rooted[local.Address(abs)] = true
+			}
+		}
 		return m.loadFile(m.start, -1, "start")
 	}
 	return m.load(m.start, -1, "start")
@@ -341,6 +354,19 @@ func (m Model) sibling(key, none string) (tea.Model, tea.Cmd) {
 	if key == "urlNext" {
 		why = "next"
 	}
+	if m.view.Site != nil {
+		pagePath, _ := local.PathOf(m.view.Page.URL)
+		ll, err := m.view.Site.ResolveLink(pagePath, dest)
+		if err != nil {
+			m.status = err.Error()
+			return m, nil
+		}
+		l := browse.Link{URL: ll.URL}
+		if ll.Path != "" {
+			l = browse.Link{URL: local.Address(ll.Path), Path: ll.Path}
+		}
+		return m.followResolved(l, why)
+	}
 	addr, err := browse.Resolve(m.view.Page.URL, dest)
 	if err != nil {
 		m.status = err.Error()
@@ -441,8 +467,7 @@ func (m Model) follow() (tea.Model, tea.Cmd) {
 	if m.view != nil {
 		for _, l := range m.view.Links {
 			if l.N == n {
-				m.busy, m.status = true, "loading "+l.URL
-				return m, m.load(l.URL, -1, "link")
+				return m.followLink(l)
 			}
 		}
 	}
@@ -466,9 +491,9 @@ func (m Model) View() tea.View {
 	if m.view != nil {
 		title = m.view.Page.Title()
 		if title == "" {
-			title = m.view.Page.URL
+			title = shown(m.view.Page.URL)
 		}
-		title += "  " + m.view.Page.URL
+		title += "  " + shown(m.view.Page.URL)
 		if m.view.Page.Reader {
 			title += "  [HTML, reader view]"
 		}
@@ -499,7 +524,7 @@ func (m Model) View() tea.View {
 	if m.focus != 0 && m.status == "" && m.num == "" && m.view != nil {
 		for _, l := range m.view.Links {
 			if l.N == m.focus {
-				foot = "→ " + l.URL
+				foot = "→ " + shown(l.URL)
 			}
 		}
 	}

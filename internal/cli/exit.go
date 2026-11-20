@@ -4,6 +4,7 @@ package cli
 
 import (
 	"errors"
+	"io/fs"
 
 	"github.com/rsdoiel/cmarkbrowser/internal/page"
 )
@@ -11,14 +12,15 @@ import (
 // Exit codes, per workspace DR-0003. Only the classes this program can
 // produce so far are listed; add the others when something returns them.
 const (
-	ExitOK          = 0
-	ExitNegative    = 1
-	ExitUsage       = 2
-	ExitData        = 65
-	ExitNoInput     = 66
-	ExitUnavailable = 69
-	ExitInternal    = 70
-	ExitCantCreate  = 73
+	ExitOK           = 0
+	ExitNegative     = 1
+	ExitUsage        = 2
+	ExitData         = 65
+	ExitNoInput      = 66
+	ExitUnavailable  = 69
+	ExitInternal     = 70
+	ExitCantCreate   = 73
+	ExitNoPermission = 77
 )
 
 // ErrUsage marks a bad command line; wrap it with %w to exit 2.
@@ -35,7 +37,7 @@ var ErrCantCreate = errors.New("cannot create")
  *   err (error) — nil, or an error wrapping one of this package's sentinels
  *
  * Returns:
- *   int — 0 for nil, the class code (2, 65, 66, 69, 73), or ExitInternal for an unclassified error
+ *   int — 0 for nil, the class code (2, 65, 66, 69, 73, 77), or ExitInternal for an unclassified error
  *
  * Example:
  *   cli.ExitCode(fmt.Errorf("%w: no URL", cli.ErrUsage)) // 2
@@ -46,6 +48,8 @@ func ExitCode(err error) int {
 		return ExitOK
 	case errors.Is(err, ErrUsage):
 		return ExitUsage
+	case errors.Is(err, fs.ErrPermission):
+		return ExitNoPermission
 	case errors.Is(err, ErrCantCreate):
 		return ExitCantCreate
 	case errors.Is(err, page.ErrData):

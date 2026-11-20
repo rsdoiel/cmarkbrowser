@@ -287,8 +287,14 @@ func TestLocalFileFailuresHaveTheRightExitCodes(t *testing.T) {
 	if code, _, errs := run("-dump", filepath.Join(dir, "missing.md")); code != ExitNoInput {
 		t.Errorf("missing file: exit %d (%s), want 66", code, errs)
 	}
-	if code, _, errs := run("-dump", dir); code != ExitData {
-		t.Errorf("a directory: exit %d (%s), want 65", code, errs)
+	// DR-0001: a directory is a site; with no index.md it is a missing input
+	if code, _, errs := run("-dump", dir); code != ExitNoInput {
+		t.Errorf("a directory with no index.md: exit %d (%s), want 66", code, errs)
+	}
+	bin := filepath.Join(dir, "bin.md")
+	os.WriteFile(bin, []byte("a\x00b"), 0o644)
+	if code, _, errs := run("-dump", bin); code != ExitData {
+		t.Errorf("a binary file: exit %d (%s), want 65", code, errs)
 	}
 }
 
@@ -368,9 +374,52 @@ func TestAnExplicitHistoryFileIsTheStartPage(t *testing.T) {
 
 func TestHelpDocumentsOpenAndHistory(t *testing.T) {
 	_, out, _ := run("-h")
-	for _, want := range []string{"-history FILE", "-no-history", "o asks for an address", "H opens"} {
+	for _, want := range []string{"-history FILE", "-no-history", "o asks for an address", "H opens", "site root", "no web server and no protocol"} {
 		if !strings.Contains(out, want) {
 			t.Errorf("help lacks %q", want)
 		}
+	}
+}
+
+func TestADirectoryIsASiteAndStartsAtItsIndex(t *testing.T) {
+	dir := t.TempDir()
+	os.WriteFile(filepath.Join(dir, "index.md"), []byte("# Home\n\n[about](about.md) [root](/about.md) [out](../x.md) [f](file:///etc/hostname)\n"), 0o644)
+	os.WriteFile(filepath.Join(dir, "about.md"), []byte("# About\n"), 0o644)
+	t.Chdir(dir)
+	code, out, errs := run("-dump", "-style", "notty", "./")
+	if code != ExitOK || !strings.Contains(out, "Home") {
+		t.Fatalf("exit %d\nstdout %q\nstderr %q", code, out, errs)
+	}
+	links := out[strings.Index(out, "Links:"):]
+	if strings.Contains(links, "file:///tmp") || strings.Contains(links, "file://"+dir) {
+		t.Errorf("a local page's links are shown as paths, not file: addresses:\n%s", links)
+	}
+	want := filepath.Join(dir, "about.md")
+	if real, err := filepath.EvalSymlinks(want); err == nil {
+		want = real
+	}
+	if strings.Count(links, "] "+want+"\n") != 2 {
+		t.Errorf("both about links should resolve inside the root (\"/about.md\" is the site root, not /):\n%s", out)
+	}
+}
+
+func TestAFileAddressIsNotAPathAndExitsWithUsage(t *testing.T) {
+	for _, arg := range []string{"file:///etc/hostname", "FILE:///tmp/x.md", "file:x.md"} {
+		if code, _, errs := run("-dump", arg); code != ExitUsage || !strings.Contains(errs, "give a path") {
+			t.Errorf("%s: exit %d (%s), want 2", arg, code, errs)
+		}
+	}
+}
+
+func TestAnUnreadableSiteExitsWithNoPermission(t *testing.T) {
+	if os.Geteuid() == 0 {
+		t.Skip("root reads everything")
+	}
+	dir := t.TempDir()
+	os.WriteFile(filepath.Join(dir, "index.md"), []byte("# x\n"), 0o644)
+	os.Chmod(dir, 0o000)
+	defer os.Chmod(dir, 0o755)
+	if code, _, errs := run("-dump", dir); code != ExitNoPermission {
+		t.Errorf("exit %d (%s), want 77", code, errs)
 	}
 }

@@ -274,10 +274,36 @@ func Key(address string) string {
  */
 func (d *Doc) Neighbours(page string) (prev, next string, ok bool) {
 	want := Key(page)
+	return d.neighboursWhere(func(l leaf) bool { return l.key == want })
+}
+
+/** NeighboursByPath is Neighbours for a page known only by its path under a
+ * site root, as a local page is: an entry matches when its address's path ends
+ * with "/" and rel (a.html matching a.md as in Key), whatever its scheme and
+ * host, since the outline lists the published site's addresses.
+ *
+ * Parameters:
+ *   rel (string) — the page's path below the site root, with "/" separators
+ *
+ * Returns:
+ *   string, string, bool — as Neighbours; the addresses are the outline's own
+ *
+ * Example:
+ *   prev, next, ok := d.NeighboursByPath("blog/2026/11/19/a.md")
+ */
+func (d *Doc) NeighboursByPath(rel string) (prev, next string, ok bool) {
+	want := "/" + strings.TrimPrefix(Key("http://x/" + strings.TrimPrefix(rel, "/"))[len("http://x"):], "/")
+	return d.neighboursWhere(func(l leaf) bool {
+		u, err := url.Parse(l.key)
+		return err == nil && strings.HasSuffix(u.Path, want)
+	})
+}
+
+func (d *Doc) neighboursWhere(match func(leaf) bool) (prev, next string, ok bool) {
 	all := d.leaves()
 	at := -1
 	for i, l := range all {
-		if l.key == want {
+		if match(l) {
 			at = i
 			break
 		}

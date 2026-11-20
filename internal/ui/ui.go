@@ -12,7 +12,9 @@ import (
 	"charm.land/bubbles/v2/viewport"
 	tea "charm.land/bubbletea/v2"
 	"github.com/rsdoiel/cmarkbrowser/internal/browse"
+	"github.com/rsdoiel/cmarkbrowser/internal/debuglog"
 	"github.com/rsdoiel/cmarkbrowser/internal/render"
+	"github.com/rsdoiel/cmarkbrowser/internal/search"
 )
 
 // maxWidth keeps lines readable on a very wide terminal.
@@ -27,6 +29,7 @@ type loadMsg struct {
 	err  error
 	addr string
 	idx  int // history index to move to, or -1 to add a new entry
+	took time.Duration
 }
 
 /** Model is the browser. Create it with New and give it to tea.NewProgram.
@@ -51,6 +54,17 @@ type Model struct {
 	focus  int    // number of the focused link, 0 for none
 	status string
 	busy   bool
+	log    *debuglog.Logger // nil unless -debug
+
+	// search: a prompt being typed, and the matches of the last search
+	prompt      bool
+	query       string // pattern being typed
+	last        string // last pattern run, for / then Enter
+	pattern     string // pattern of the active search, "" for none
+	matches     []search.Match
+	cur         int            // index of the current match
+	marked      *search.Marked // the page with the matches marked, for the focus in markedFocus
+	markedFocus int
 }
 
 /** New returns a browser that opens start when it runs.
@@ -69,25 +83,63 @@ func New(start string, r render.Renderer) Model {
 	return Model{r: r, start: start, idx: -1, w: 80, h: 24, vp: viewport.New(viewport.WithWidth(80), viewport.WithHeight(22))}
 }
 
+/** WithDebug returns the browser with a debug logger: every key, load, status
+ * message, focus move, scroll and resize is written to it as a JSON line. A
+ * nil logger logs nothing.
+ *
+ * Parameters:
+ *   l (*debuglog.Logger) — where the events go
+ *
+ * Returns:
+ *   Model — the same browser with logging on
+ *
+ * Example:
+ *   m := ui.New(addr, r).WithDebug(debuglog.New(f))
+ */
+func (m Model) WithDebug(l *debuglog.Logger) Model {
+	m.log = l
+	return m
+}
+
 // width is the column count pages are rendered to.
 func (m Model) width() int { return min(max(m.w, 20), maxWidth) }
 
 // Init loads the start page.
-func (m Model) Init() tea.Cmd { return m.load(m.start, -1) }
+func (m Model) Init() tea.Cmd { return m.load(m.start, -1, "start") }
 
-// load fetches addr; idx is the history index to move to, or -1 to add an entry.
-func (m Model) load(addr string, idx int) tea.Cmd {
-	r, width := m.r, m.width()
+// load fetches addr; idx is the history index to move to, or -1 to add an
+// entry; why says what asked for it (start, link, history, next, prev) for the
+// debug log.
+func (m Model) load(addr string, idx int, why string) tea.Cmd {
+	r, width, log := m.r, m.width(), m.log
+	log.Event("load.start", "addr", addr, "idx", idx, "why", why)
 	return func() tea.Msg {
-		ctx, cancel := context.WithTimeout(context.Background(), fetchTimeout)
+		t0 := time.Now()
+		ctx, cancel := context.WithTimeout(debuglog.WithContext(context.Background(), log), fetchTimeout)
 		defer cancel()
 		v, err := browse.Open(ctx, addr, r, width)
-		return loadMsg{v: v, err: err, addr: addr, idx: idx}
+		return loadMsg{v: v, err: err, addr: addr, idx: idx, took: time.Since(t0)}
 	}
 }
 
-// Update handles keys, resizes and finished loads.
+// Update handles keys, resizes and finished loads, and logs what happened.
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	before := m.status
+	switch v := msg.(type) {
+	case tea.KeyPressMsg:
+		m.log.Event("key", "key", v.String(), "num", m.num, "focus", m.focus)
+	case tea.WindowSizeMsg:
+		m.log.Event("resize", "w", v.Width, "h", v.Height)
+	}
+	next, cmd := m.update(msg)
+	if nm, ok := next.(Model); ok && nm.status != "" && nm.status != before {
+		m.log.Event("status", "text", nm.status)
+	}
+	return next, cmd
+}
+
+// update is Update without the logging.
+func (m Model) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
 		m.w, m.h = msg.Width, msg.Height
@@ -97,7 +149,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if err := m.view.Rerender(m.r, m.width()); err != nil {
 				m.status = err.Error()
 			}
-			m.vp.SetContent(m.view.Display(m.focus))
+			m.reindex()
+			m.refresh()
 		}
 		return m, nil
 	case loadMsg:
@@ -112,9 +165,12 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 func (m Model) loaded(msg loadMsg) Model {
 	m.busy = false
 	if msg.err != nil {
+		m.log.Event("load.done", "addr", msg.addr, "ok", false, "err", msg.err, "ms", msg.took)
 		m.status = msg.err.Error()
 		return m
 	}
+	m.log.Event("load.done", "addr", msg.addr, "final", msg.v.Page.URL, "ok", true, "idx", msg.idx, "ms", msg.took,
+		"links", len(msg.v.Links), "missing_keys", msg.v.Missing)
 	m.status = ""
 	if len(msg.v.Missing) > 0 {
 		m.status = "no front matter value for {{page." + strings.Join(msg.v.Missing, "}}, {{page.") + "}}"
@@ -131,6 +187,8 @@ func (m Model) loaded(msg loadMsg) Model {
 		m.idx = msg.idx
 	}
 	m.focus = 0
+	// a search belongs to the page it was run on
+	m.prompt, m.query, m.matches, m.marked, m.pattern, m.cur = false, "", nil, nil, "", 0
 	m.vp.SetContent(msg.v.Display(0))
 	m.vp.GotoTop()
 	return m
@@ -138,9 +196,13 @@ func (m Model) loaded(msg loadMsg) Model {
 
 // key handles one key press.
 func (m Model) key(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
+	if m.prompt {
+		return m.promptKey(msg)
+	}
 	s := msg.String()
 	switch {
 	case s == "ctrl+c" || (s == "q" && m.num == ""):
+		m.log.Event("quit", "key", s)
 		return m, tea.Quit
 	case len(s) == 1 && s[0] >= '0' && s[0] <= '9':
 		if len(m.num) < 4 {
@@ -149,11 +211,22 @@ func (m Model) key(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		m.status = ""
 		return m, nil
 	case s == "esc":
-		if m.num == "" && m.focus != 0 {
+		// Esc undoes one thing: a typed number, else the focus, else the search.
+		switch {
+		case m.num != "":
+		case m.focus != 0:
 			m.setFocus(0)
+		case len(m.matches) > 0:
+			m.clearSearch()
 		}
 		m.num, m.status = "", ""
 		return m, nil
+	case s == "/" && m.num == "":
+		return m.openPrompt(), nil
+	case s == "n" && m.num == "":
+		return m.nextMatch(1), nil
+	case s == "N" && m.num == "":
+		return m.nextMatch(-1), nil
 	case s == "tab":
 		return m.moveFocus(1), nil
 	case s == "shift+tab":
@@ -166,9 +239,9 @@ func (m Model) key(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	case s == "enter" && m.focus != 0:
 		m.num = strconv.Itoa(m.focus)
 		return m.follow()
-	case s == "n" && m.num == "":
+	case s == "]" && m.num == "":
 		return m.sibling("urlNext", "no next page")
-	case s == "p" && m.num == "":
+	case s == "[" && m.num == "":
 		return m.sibling("urlPrev", "no previous page")
 	case s == "b" || s == "left":
 		return m.step(-1)
@@ -177,6 +250,7 @@ func (m Model) key(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	}
 	var cmd tea.Cmd
 	m.vp, cmd = m.vp.Update(msg)
+	m.log.Event("scroll", "key", s, "offset", m.vp.YOffset(), "percent", int(m.vp.ScrollPercent()*100))
 	return m, cmd
 }
 
@@ -196,13 +270,17 @@ func (m Model) sibling(key, none string) (tea.Model, tea.Cmd) {
 		m.status = none
 		return m, nil
 	}
+	why := "prev"
+	if key == "urlNext" {
+		why = "next"
+	}
 	addr, err := browse.Resolve(m.view.Page.URL, dest)
 	if err != nil {
 		m.status = err.Error()
 		return m, nil
 	}
 	m.busy, m.status = true, "loading "+addr
-	return m, m.load(addr, -1)
+	return m, m.load(addr, -1, why)
 }
 
 // focusable returns the links whose markers were found in the rendered text.
@@ -269,7 +347,14 @@ func (m Model) moveFocus(dir int) Model {
 // setFocus focuses link n (0 for none), redraws, and scrolls it into view.
 func (m *Model) setFocus(n int) {
 	m.focus = n
-	m.vp.SetContent(m.view.Display(n))
+	url := ""
+	for _, l := range m.view.Links {
+		if l.N == n {
+			url = l.URL
+		}
+	}
+	m.log.Event("focus", "n", n, "url", url)
+	m.refresh()
 	if n == 0 {
 		return
 	}
@@ -290,7 +375,7 @@ func (m Model) follow() (tea.Model, tea.Cmd) {
 		for _, l := range m.view.Links {
 			if l.N == n {
 				m.busy, m.status = true, "loading "+l.URL
-				return m, m.load(l.URL, -1)
+				return m, m.load(l.URL, -1, "link")
 			}
 		}
 	}
@@ -305,7 +390,7 @@ func (m Model) step(delta int) (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 	m.busy, m.status = true, "loading "+m.hist[to]
-	return m, m.load(m.hist[to], to)
+	return m, m.load(m.hist[to], to, "history")
 }
 
 // View draws the title line, the page and the status line.
@@ -317,18 +402,26 @@ func (m Model) View() tea.View {
 			title = m.view.Page.URL
 		}
 		title += "  " + m.view.Page.URL
+		if m.view.Page.Reader {
+			title += "  [HTML, reader view]"
+		}
 	}
-	foot := "Tab focus link  Enter follow  b back  f forward"
+	foot := "Tab focus link  Enter follow  / search  b back  f forward"
 	if m.view != nil {
 		if v := m.view.Page.URLPrev(); v != "" {
-			foot += "  p prev"
+			foot += "  [ prev"
 		}
 		if v := m.view.Page.URLNext(); v != "" {
-			foot += "  n next"
+			foot += "  ] next"
 		}
 	}
 	foot += "  q quit"
+	if len(m.matches) > 0 {
+		foot = fmt.Sprintf("/%s  %d of %d  n next  N prev  Esc clear", m.pattern, m.cur+1, len(m.matches))
+	}
 	switch {
+	case m.prompt:
+		foot = "/" + m.query + "▏"
 	case m.status != "":
 		foot = m.status
 	case m.num != "":
@@ -341,7 +434,7 @@ func (m Model) View() tea.View {
 			}
 		}
 	}
-	if m.view != nil && m.status == "" && m.num == "" {
+	if m.view != nil && m.status == "" && m.num == "" && !m.prompt {
 		foot = fmt.Sprintf("%3.0f%%  %s", m.vp.ScrollPercent()*100, foot)
 	}
 	v := tea.NewView(clip(title, m.w) + "\n" + m.vp.View() + "\n" + clip(foot, m.w))

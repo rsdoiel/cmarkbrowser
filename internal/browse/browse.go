@@ -8,7 +8,9 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"time"
 
+	"github.com/rsdoiel/cmarkbrowser/internal/debuglog"
 	"github.com/rsdoiel/cmarkbrowser/internal/page"
 	"github.com/rsdoiel/cmarkbrowser/internal/render"
 )
@@ -45,6 +47,7 @@ type View struct {
 	Missing []string
 
 	lines map[int]int // link number -> line of its marker in Text
+	log   *debuglog.Logger
 }
 
 /** Resolve resolves a link destination against the address of the page it is on.
@@ -88,17 +91,31 @@ func Resolve(base, dest string) (string, error) {
  *   v, err := browse.Open(ctx, "https://x.org/a.md", render.Glamour{}, 80)
  */
 func Open(ctx context.Context, addr string, r render.Renderer, width int) (*View, error) {
+	log := debuglog.FromContext(ctx)
+	t0 := time.Now()
 	p, err := page.Fetch(ctx, addr)
+	if err != nil && page.IsHTML(err) {
+		// An HTML page with no Markdown copy: a link that left the Markdown
+		// web. Show it in reader view instead of stopping.
+		p, err = page.FetchReader(ctx, addr)
+	}
 	if err != nil {
 		return nil, err
 	}
-	body, missing := render.Expand(p.Body, p.Meta)
+	t1 := time.Now()
+	body, missing := p.Body, []string(nil)
+	if !p.Reader { // {{page.NAME}} macros are Markdown-web front matter, not HTML text
+		body, missing = render.Expand(p.Body, p.Meta)
+	}
+	t2 := time.Now()
 	clean, links := render.Prepare(body)
+	t3 := time.Now()
 	text, err := r.Render(clean, width)
 	if err != nil {
 		return nil, fmt.Errorf("rendering %s: %w", addr, err)
 	}
-	v := &View{Page: p, Clean: clean, Text: text, Missing: missing}
+	t4 := time.Now()
+	v := &View{Page: p, Clean: clean, Text: text, Missing: missing, log: log}
 	v.index()
 	for _, l := range links {
 		// A link that cannot be resolved stays in the text but is not followable.
@@ -108,8 +125,16 @@ func Open(ctx context.Context, addr string, r render.Renderer, width int) (*View
 		}
 		v.Links = append(v.Links, Link{N: l.N, Text: l.Text, URL: u})
 	}
+	log.Event("open", "url", addr, "final", p.URL, "width", width,
+		"fetch_ms", t1.Sub(t0), "expand_ms", t2.Sub(t1), "prepare_ms", t3.Sub(t2), "render_ms", t4.Sub(t3),
+		"total_ms", time.Since(t0), "body_bytes", len(p.Body), "text_bytes", len(text),
+		"lines", strings.Count(text, "\n")+1, "links", len(v.Links), "missing_keys", missing, "reader", p.Reader)
 	return v, nil
 }
+
+// SetLogger sets where Rerender writes its debug events. Open sets it from
+// its context; this is for a View made another way.
+func (v *View) SetLogger(l *debuglog.Logger) { v.log = l }
 
 /** Rerender renders the page again at a new width, for a resized terminal,
  * without fetching it.
@@ -125,12 +150,14 @@ func Open(ctx context.Context, addr string, r render.Renderer, width int) (*View
  *   err := v.Rerender(render.Glamour{}, 100)
  */
 func (v *View) Rerender(r render.Renderer, width int) error {
+	t0 := time.Now()
 	text, err := r.Render(v.Clean, width)
 	if err != nil {
 		return fmt.Errorf("rendering %s: %w", v.Page.URL, err)
 	}
 	v.Text = text
 	v.index()
+	v.log.Event("rerender", "url", v.Page.URL, "width", width, "ms", time.Since(t0), "lines", strings.Count(text, "\n")+1)
 	return nil
 }
 

@@ -1,12 +1,15 @@
 package browse
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
 
+	"github.com/rsdoiel/cmarkbrowser/internal/debuglog"
 	"github.com/rsdoiel/cmarkbrowser/internal/render"
 )
 
@@ -200,5 +203,119 @@ func TestOpenExpandsPageMacrosAndReportsMissing(t *testing.T) {
 	}
 	if len(v.Missing) != 1 || v.Missing[0] != "pubDate" {
 		t.Errorf("Missing = %v", v.Missing)
+	}
+}
+
+func TestOpenLogsTimingsAndCounts(t *testing.T) {
+	srv := site(t)
+	defer srv.Close()
+	var buf bytes.Buffer
+	ctx := debuglog.WithContext(context.Background(), debuglog.New(&buf))
+	v, err := Open(ctx, srv.URL+"/docs/a.md", render.Glamour{Style: "notty"}, 60)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var open map[string]any
+	for _, line := range strings.Split(strings.TrimSpace(buf.String()), "\n") {
+		var e map[string]any
+		if err := json.Unmarshal([]byte(line), &e); err != nil {
+			t.Fatalf("not JSON: %q", line)
+		}
+		if e["event"] == "open" {
+			open = e
+		}
+	}
+	if open == nil {
+		t.Fatalf("no open event in:\n%s", buf.String())
+	}
+	for _, k := range []string{"url", "final", "width", "fetch_ms", "expand_ms", "prepare_ms", "render_ms", "total_ms", "body_bytes", "text_bytes", "lines", "links", "missing_keys"} {
+		if _, ok := open[k]; !ok {
+			t.Errorf("open event lacks %q: %v", k, open)
+		}
+	}
+	if open["links"] != float64(len(v.Links)) || open["width"] != float64(60) {
+		t.Errorf("counts wrong: %v", open)
+	}
+	if strings.Contains(buf.String(), "Page A") || strings.Contains(buf.String(), "bad()") {
+		t.Errorf("log holds page content:\n%s", buf.String())
+	}
+}
+
+func TestRerenderLogsItsWidthAndTime(t *testing.T) {
+	srv := site(t)
+	defer srv.Close()
+	v, err := Open(context.Background(), srv.URL+"/docs/a.md", render.Glamour{Style: "notty"}, 60)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var buf bytes.Buffer
+	v.SetLogger(debuglog.New(&buf))
+	if err := v.Rerender(render.Glamour{Style: "notty"}, 40); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(buf.String(), `"event":"rerender"`) || !strings.Contains(buf.String(), `"width":40`) {
+		t.Errorf("log %q", buf.String())
+	}
+}
+
+func htmlSite(t *testing.T) *httptest.Server {
+	t.Helper()
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/story":
+			w.Header().Set("Content-Type", "text/html")
+			w.Write([]byte(`<html><head><title>Story Title</title></head><body><nav>menu</nav><article><h1>Story Title</h1>
+<p>` + strings.Repeat("Story words {{page.title}} here. ", 12) + `See <a href="/other">the other page</a>.</p></article></body></html>`))
+		case "/image.png":
+			w.Header().Set("Content-Type", "image/png")
+			w.Write([]byte("x"))
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	t.Cleanup(srv.Close)
+	return srv
+}
+
+func TestOpenShowsAnHTMLPageInReaderView(t *testing.T) {
+	srv := htmlSite(t)
+	v, err := Open(context.Background(), srv.URL+"/story", render.Glamour{Style: "notty"}, 80)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !v.Page.Reader || v.Page.Title() != "Story Title" {
+		t.Errorf("page %+v", v.Page)
+	}
+	if !strings.Contains(v.Text, "Story words") || strings.Contains(v.Text, "menu") {
+		t.Errorf("text:\n%s", v.Text)
+	}
+	if len(v.Links) != 1 || v.Links[0].URL != srv.URL+"/other" {
+		t.Errorf("links %#v", v.Links)
+	}
+	// the page's own {{...}} text is not a macro of ours
+	if len(v.Missing) != 0 || !strings.Contains(v.Text, "{{page.title}}") {
+		t.Errorf("macros were applied to an HTML page: missing %v", v.Missing)
+	}
+}
+
+func TestOpenStillFailsForWhatIsNeitherMarkdownNorHTML(t *testing.T) {
+	srv := htmlSite(t)
+	if _, err := Open(context.Background(), srv.URL+"/image.png", render.Glamour{Style: "notty"}, 80); err == nil {
+		t.Error("an image opened as a page")
+	}
+	if _, err := Open(context.Background(), srv.URL+"/missing", render.Glamour{Style: "notty"}, 80); err == nil {
+		t.Error("a missing page opened")
+	}
+}
+
+func TestOpenLogsThatItUsedReaderView(t *testing.T) {
+	srv := htmlSite(t)
+	var buf bytes.Buffer
+	ctx := debuglog.WithContext(context.Background(), debuglog.New(&buf))
+	if _, err := Open(ctx, srv.URL+"/story", render.Glamour{Style: "notty"}, 80); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(buf.String(), `"reader":true`) {
+		t.Errorf("open event does not say reader:\n%s", buf.String())
 	}
 }

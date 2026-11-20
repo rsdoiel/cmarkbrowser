@@ -19,7 +19,7 @@ const HelpText = `%{app_name}(1) user manual | version {version} {release_hash}
 
 {app_name} [OPTIONS] [URL]
 
-{app_name} -dump [-style NAME] [-width N] URL
+{app_name} -dump [-style NAME] [-width N] [-debug FILE] URL
 
 # DESCRIPTION
 
@@ -30,9 +30,21 @@ from /.well-known/toc.opml.
 
 In the browser, Tab and Shift-Tab move between links (the focused link's
 address is shown at the bottom) and Enter follows it. Or type a link's number
-and press Enter. b and f go back and forward; n and p open the next and
-previous page that the page names in its urlNext and urlPrev front matter; Esc clears a typed number or the
-focus; arrows, PgUp, PgDn, space, g and G scroll; q quits.
+and press Enter. b and f go back and forward; ] and [ open the next and
+previous page that the page names in its urlNext and urlPrev front matter; Esc
+clears a typed number, then the focus, then a search; arrows, PgUp, PgDn, space,
+g and G scroll; q quits.
+
+/ searches the page. Type a Go regular expression (the RE2 syntax of the
+regexp package) and press Enter: the page scrolls to the first match at or
+below the top of the window, every match is marked and the current one is
+highlighted. n goes to the next match and N to the previous one, wrapping at
+either end. A pattern with no upper-case letter ignores case; an upper-case
+letter makes it case sensitive; write (?i) or (?-i) to decide yourself. Text
+is searched as you read it: the lines of one paragraph count as one run of
+words, so a phrase is found even where the screen wrapped it, and a match never
+runs from one paragraph into the next. / then Enter on an empty prompt repeats
+the last search. A search belongs to the page it was run on.
 
 # OPTIONS
 
@@ -50,6 +62,15 @@ focus; arrows, PgUp, PgDn, space, g and G scroll; q quits.
 
 -width N
 : Columns to wrap to (default 80).
+
+-debug FILE
+: Append a log of the session to FILE, one JSON object per line: every key
+  pressed, every address tried (the same address, the page's declared Markdown
+  alternate, the .md sibling) with its status, size, time and outcome, which of
+  them produced the page, the time each step took, and the exit code. It holds
+  addresses, key names, counts and times, never page content. The file is
+  created with mode 0600. Use it to see why a page opened as it did, and to
+  send a session to someone who can read it.
 
 -v, -version
 : Show the version.
@@ -73,4 +94,7 @@ focus; arrows, PgUp, PgDn, space, g and G scroll; q quits.
 
 70
 : A bug.
+
+73
+: The -debug file cannot be created.
 `

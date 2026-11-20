@@ -1,11 +1,15 @@
 package page
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
+
+	"github.com/rsdoiel/cmarkbrowser/internal/debuglog"
 )
 
 // altSite serves what antenna generates for a collection "food": food.html
@@ -168,5 +172,154 @@ func TestFetchReadsOnlyTheHeadOfALargeHTMLPage(t *testing.T) {
 	p, err := Fetch(context.Background(), big.URL+"/big.html")
 	if err != nil || !strings.Contains(p.Body, "Items") {
 		t.Errorf("got %v, %v", p, err)
+	}
+}
+
+// logged runs fn with a debug logger in the context and returns the events.
+func logged(t *testing.T, fn func(ctx context.Context)) []map[string]any {
+	t.Helper()
+	var buf bytes.Buffer
+	fn(debuglog.WithContext(context.Background(), debuglog.New(&buf)))
+	var evs []map[string]any
+	for _, line := range strings.Split(strings.TrimSpace(buf.String()), "\n") {
+		if line == "" {
+			continue
+		}
+		var m map[string]any
+		if err := json.Unmarshal([]byte(line), &m); err != nil {
+			t.Fatalf("not JSON: %q", line)
+		}
+		evs = append(evs, m)
+	}
+	return evs
+}
+
+func TestFetchLogsTheChainThatProducedThePage(t *testing.T) {
+	srv, _ := altSite(t)
+	evs := logged(t, func(ctx context.Context) {
+		if _, err := Fetch(ctx, srv.URL+"/food.html"); err != nil {
+			t.Fatal(err)
+		}
+	})
+	var tries []map[string]any
+	var result map[string]any
+	for _, e := range evs {
+		switch e["event"] {
+		case "fetch.try":
+			tries = append(tries, e)
+		case "fetch.result":
+			result = e
+		}
+	}
+	if len(tries) != 2 {
+		t.Fatalf("want a try of the same address and one of the alternate, got %v", evs)
+	}
+	if tries[0]["role"] != "same" || tries[0]["status"] != float64(200) || tries[0]["outcome"] != "not_markdown" ||
+		!strings.HasPrefix(tries[0]["content_type"].(string), "text/html") {
+		t.Errorf("first try: %v", tries[0])
+	}
+	if tries[1]["role"] != "alternate" || tries[1]["outcome"] != "markdown" || !strings.HasSuffix(tries[1]["url"].(string), "/food_items.md") {
+		t.Errorf("second try: %v", tries[1])
+	}
+	if result == nil || result["via"] != "alternate" || !strings.HasSuffix(result["final"].(string), "/food_items.md") || result["requested"] != srv.URL+"/food.html" {
+		t.Errorf("result: %v", result)
+	}
+	for _, e := range tries {
+		if _, ok := e["ms"]; !ok {
+			t.Errorf("no timing: %v", e)
+		}
+		if _, ok := e["bytes"]; !ok {
+			t.Errorf("no size: %v", e)
+		}
+	}
+}
+
+func TestFetchLogsWhyTheSiblingWasUsed(t *testing.T) {
+	srv, _ := altSite(t)
+	evs := logged(t, func(ctx context.Context) {
+		if _, err := Fetch(ctx, srv.URL+"/gone.html"); err != nil {
+			t.Fatal(err)
+		}
+	})
+	var roles, outcomes []string
+	var via string
+	for _, e := range evs {
+		if e["event"] == "fetch.try" {
+			roles = append(roles, e["role"].(string))
+			outcomes = append(outcomes, e["outcome"].(string))
+		}
+		if e["event"] == "fetch.result" {
+			via = e["via"].(string)
+		}
+	}
+	if strings.Join(roles, ",") != "same,alternate,sibling" || strings.Join(outcomes, ",") != "not_markdown,not_found,markdown" || via != "sibling" {
+		t.Errorf("roles %v outcomes %v via %q", roles, outcomes, via)
+	}
+}
+
+func TestFetchLogsAFailure(t *testing.T) {
+	srv, _ := altSite(t)
+	evs := logged(t, func(ctx context.Context) {
+		if _, err := Fetch(ctx, srv.URL+"/nothing.html"); err == nil {
+			t.Fatal("want an error")
+		}
+	})
+	last := evs[len(evs)-1]
+	if last["event"] != "fetch.result" || last["via"] != "none" || last["err"] == nil {
+		t.Errorf("last event %v", last)
+	}
+}
+
+// Logging records no page content.
+func TestFetchLogHoldsNoPageContent(t *testing.T) {
+	srv, _ := altSite(t)
+	var buf bytes.Buffer
+	ctx := debuglog.WithContext(context.Background(), debuglog.New(&buf))
+	if _, err := Fetch(ctx, srv.URL+"/food.html"); err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(buf.String(), "The news") || strings.Contains(buf.String(), "<p>news</p>") {
+		t.Errorf("log holds page content:\n%s", buf.String())
+	}
+}
+
+// A server that is not a Markdown site at all (here, one that answers 200 with
+// no Content-Type and names itself in Server) must be recognisable from the
+// error and from the log, not just "is not Markdown ()".
+func TestNotMarkdownErrorNamesTheContentTypeAndTheServer(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Server", "oatpp/1.4.0")
+		if r.URL.Path != "/" {
+			http.NotFound(w, r) // as hailo-ollama does for /index.md
+			return
+		}
+		w.Header()["Content-Type"] = nil // no Content-Type at all
+		w.Write([]byte("hailo-ollama is running"))
+	}))
+	defer srv.Close()
+	var buf bytes.Buffer
+	ctx := debuglog.WithContext(context.Background(), debuglog.New(&buf))
+	_, err := Fetch(ctx, srv.URL)
+	if err == nil {
+		t.Fatal("want an error")
+	}
+	msg := err.Error()
+	if strings.Contains(msg, "()") || !strings.Contains(msg, "no Content-Type") || !strings.Contains(msg, "oatpp/1.4.0") {
+		t.Errorf("message %q: want no empty parentheses, 'no Content-Type' and the Server", msg)
+	}
+	if !strings.Contains(buf.String(), `"server":"oatpp/1.4.0"`) {
+		t.Errorf("log lacks the server:\n%s", buf.String())
+	}
+}
+
+func TestNotMarkdownErrorStillNamesAContentType(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/html")
+		w.Write([]byte("<p>hi</p>"))
+	}))
+	defer srv.Close()
+	_, err := Fetch(context.Background(), srv.URL+"/x")
+	if err == nil || !strings.Contains(err.Error(), "text/html") || strings.Contains(err.Error(), "no Content-Type") {
+		t.Errorf("err %v", err)
 	}
 }

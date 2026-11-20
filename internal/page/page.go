@@ -15,6 +15,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/rsdoiel/cmarkbrowser/internal/debuglog"
+	"github.com/rsdoiel/cmarkbrowser/internal/reader"
 	"golang.org/x/net/html"
 	"gopkg.in/yaml.v3"
 )
@@ -37,6 +39,7 @@ var errNotMarkdown = errors.New("not Markdown")
 // one message, is an ErrData, and is also errNotMarkdown.
 type notMarkdown struct {
 	msg  string
+	html bool   // the answer was an HTML page
 	head []byte // the start of an HTML answer, to look for a declared alternate
 	base string // the address that answered, for resolving that alternate
 }
@@ -61,11 +64,13 @@ const maxBody = 8 << 20
  *   URL (string) — the final address, after redirects
  *   Meta (map[string]any) — the front matter, empty when there is none
  *   Body (string) — the Markdown with the front matter removed
+ *   Reader (bool) — Body is a reader view made from an HTML page
  */
 type Page struct {
-	URL  string
-	Meta map[string]any
-	Body string
+	URL    string
+	Meta   map[string]any
+	Body   string
+	Reader bool // the Body is a reader view of an HTML page, not the page's own Markdown
 }
 
 // str returns the front matter value for key as a string, or "".
@@ -202,29 +207,41 @@ func IsMarkdown(contentType, p string) bool {
  *   p, err := page.Fetch(ctx, "https://dave.writersweb.org/")
  */
 func Fetch(ctx context.Context, rawurl string) (*Page, error) {
-	p, err := fetchOne(ctx, rawurl)
-	if err == nil || !errors.Is(err, errNotMarkdown) {
+	log := debuglog.FromContext(ctx)
+	done := func(p *Page, via string, err error) (*Page, error) {
+		final := ""
+		if p != nil {
+			final = p.URL
+		}
+		log.Event("fetch.result", "requested", rawurl, "final", final, "via", via, "err", err)
 		return p, err
+	}
+	p, err := fetchOne(ctx, rawurl, "same")
+	if err == nil || !errors.Is(err, errNotMarkdown) {
+		return done(p, "same", err)
 	}
 	// The page may say where its Markdown is. That beats guessing the .md
 	// sibling: for an antenna collection the sibling is the author's feed list,
 	// and the news is on the page the HTML declares.
 	var nm *notMarkdown
 	if errors.As(err, &nm) && len(nm.head) > 0 {
-		if alt := declaredAlternate(nm.base, nm.head); alt != "" && alt != rawurl {
-			if p, err2 := fetchOne(ctx, alt); err2 == nil {
-				return p, nil
+		alt := declaredAlternate(nm.base, nm.head)
+		log.Event("fetch.alternate", "base", nm.base, "head_bytes", len(nm.head), "declared", alt)
+		if alt != "" && alt != rawurl {
+			if p, err2 := fetchOne(ctx, alt, "alternate"); err2 == nil {
+				return done(p, "alternate", nil)
 			}
 		}
 	}
 	sib := markdownSibling(rawurl)
+	log.Event("fetch.sibling", "candidate", sib)
 	if sib == "" {
-		return nil, err
+		return done(nil, "none", err)
 	}
-	if p, err2 := fetchOne(ctx, sib); err2 == nil {
-		return p, nil
+	if p, err2 := fetchOne(ctx, sib, "sibling"); err2 == nil {
+		return done(p, "sibling", nil)
 	}
-	return nil, err
+	return done(nil, "none", err)
 }
 
 // markdownSibling returns the address of the Markdown copy of an HTML page or
@@ -249,8 +266,42 @@ func markdownSibling(rawurl string) string {
 	return u.String()
 }
 
-// fetchOne gets one address and parses it as a page.
-func fetchOne(ctx context.Context, rawurl string) (*Page, error) {
+// attempt is what one request learned, for the debug log.
+type attempt struct {
+	status      int
+	contentType string
+	server      string
+	bytes       int
+}
+
+// fetchOne gets one address and parses it as a page, and logs the attempt:
+// its role (same, alternate or sibling), what came back and how it ended.
+func fetchOne(ctx context.Context, rawurl, role string) (*Page, error) {
+	start := time.Now()
+	var a attempt
+	p, err := fetchAttempt(ctx, rawurl, &a)
+	outcome := "markdown"
+	switch {
+	case err == nil:
+	case errors.Is(err, errNotMarkdown):
+		outcome = "not_markdown"
+	case errors.Is(err, ErrNoInput):
+		outcome = "not_found"
+	case errors.Is(err, ErrUnavailable):
+		outcome = "unavailable"
+	case errors.Is(err, ErrData) && a.status != 0 && a.status != http.StatusOK:
+		outcome = "bad_status"
+	case errors.Is(err, ErrData):
+		outcome = "bad_content"
+	default:
+		outcome = "error"
+	}
+	debuglog.FromContext(ctx).Event("fetch.try", "role", role, "url", rawurl, "status", a.status,
+		"content_type", a.contentType, "server", a.server, "bytes", a.bytes, "outcome", outcome, "ms", time.Since(start), "err", err)
+	return p, err
+}
+
+func fetchAttempt(ctx context.Context, rawurl string, a *attempt) (*Page, error) {
 	u, err := url.Parse(rawurl)
 	if err != nil || (u.Scheme != "http" && u.Scheme != "https") {
 		return nil, fmt.Errorf("%w: %q is not an http or https address", ErrData, rawurl)
@@ -266,6 +317,7 @@ func fetchOne(ctx context.Context, rawurl string) (*Page, error) {
 		return nil, fmt.Errorf("%w: %s", ErrUnavailable, err)
 	}
 	defer resp.Body.Close()
+	a.status, a.contentType, a.server = resp.StatusCode, resp.Header.Get("Content-Type"), resp.Header.Get("Server")
 	switch {
 	case resp.StatusCode == http.StatusNotFound || resp.StatusCode == http.StatusGone:
 		return nil, fmt.Errorf("%w: %s: %s", ErrNoInput, rawurl, resp.Status)
@@ -273,10 +325,21 @@ func fetchOne(ctx context.Context, rawurl string) (*Page, error) {
 		return nil, fmt.Errorf("%w: %s: %s", ErrData, rawurl, resp.Status)
 	}
 	if !IsMarkdown(resp.Header.Get("Content-Type"), resp.Request.URL.Path) {
-		nm := &notMarkdown{msg: fmt.Sprintf("%s: %s is not Markdown (%s)", ErrData, rawurl, resp.Header.Get("Content-Type")), base: resp.Request.URL.String()}
+		// Say what did answer: a server that is not a Markdown site at all
+		// (an API on the same port, say) shows in its Server header.
+		what := "no Content-Type"
+		if ct := resp.Header.Get("Content-Type"); ct != "" {
+			what = ct
+		}
+		if srvName := resp.Header.Get("Server"); srvName != "" {
+			what += "; server " + srvName
+		}
+		nm := &notMarkdown{msg: fmt.Sprintf("%s: %s is not Markdown (%s)", ErrData, rawurl, what), base: resp.Request.URL.String()}
 		// Keep the start of an HTML page: its head may declare a Markdown alternate.
 		if mt, _, _ := mime.ParseMediaType(resp.Header.Get("Content-Type")); mt == "text/html" || mt == "application/xhtml+xml" {
+			nm.html = true
 			nm.head, _ = io.ReadAll(io.LimitReader(resp.Body, maxHead))
+			a.bytes = len(nm.head)
 		}
 		return nil, nm
 	}
@@ -284,6 +347,7 @@ func fetchOne(ctx context.Context, rawurl string) (*Page, error) {
 	if err != nil {
 		return nil, fmt.Errorf("%w: %s", ErrUnavailable, err)
 	}
+	a.bytes = len(body)
 	if len(body) > maxBody {
 		return nil, fmt.Errorf("%w: %s is larger than %d bytes", ErrData, rawurl, maxBody)
 	}
@@ -381,4 +445,107 @@ func hasWord(list, word string) bool {
 		}
 	}
 	return false
+}
+
+/** IsHTML reports whether err from Fetch means the address answered with an
+ * HTML page and no Markdown copy of it could be found, so FetchReader can show
+ * the page in reader view.
+ *
+ * Parameters:
+ *   err (error) — what Fetch returned
+ *
+ * Returns:
+ *   bool — true for an HTML page, false for nil and every other failure
+ *
+ * Example:
+ *   if page.IsHTML(err) { p, err = page.FetchReader(ctx, addr) }
+ */
+func IsHTML(err error) bool {
+	var nm *notMarkdown
+	return errors.As(err, &nm) && nm.html
+}
+
+/** FetchReader gets an HTML page and converts it to Markdown: a reader view,
+ * for a link that leaves the Markdown web. Scripts, styles, menus, forms and
+ * unsafe addresses are dropped (package reader). The returned page's address is
+ * the final one after redirects, and its Reader field is true.
+ *
+ * Parameters:
+ *   ctx (context.Context) — cancellation and deadline
+ *   rawurl (string) — an http or https address
+ *
+ * Returns:
+ *   *Page — the converted page; Meta holds its title
+ *   error — wraps ErrUnavailable, ErrNoInput or ErrData (not HTML, no text
+ *     without JavaScript, too large)
+ *
+ * Example:
+ *   p, err := page.FetchReader(ctx, "https://example.org/post")
+ */
+func FetchReader(ctx context.Context, rawurl string) (*Page, error) {
+	start := time.Now()
+	log := debuglog.FromContext(ctx)
+	u, err := url.Parse(rawurl)
+	if err != nil || (u.Scheme != "http" && u.Scheme != "https") {
+		return nil, fmt.Errorf("%w: %q is not an http or https address", ErrData, rawurl)
+	}
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, rawurl, nil)
+	if err != nil {
+		return nil, fmt.Errorf("%w: %s", ErrData, err)
+	}
+	req.Header.Set("Accept", "text/html, application/xhtml+xml")
+	resp, err := (&http.Client{Timeout: 30 * time.Second}).Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("%w: %s", ErrUnavailable, err)
+	}
+	defer resp.Body.Close()
+	ct := resp.Header.Get("Content-Type")
+	event := func(outcome string, bytes int, r reader.Result, err error) {
+		log.Event("fetch.reader", "url", rawurl, "final", resp.Request.URL.String(), "status", resp.StatusCode,
+			"content_type", ct, "server", resp.Header.Get("Server"), "bytes", bytes, "title", r.Title,
+			"out_bytes", len(r.Markdown), "truncated", r.Truncated, "outcome", outcome, "ms", time.Since(start), "err", err)
+	}
+	switch {
+	case resp.StatusCode == http.StatusNotFound || resp.StatusCode == http.StatusGone:
+		err = fmt.Errorf("%w: %s: %s", ErrNoInput, rawurl, resp.Status)
+	case resp.StatusCode != http.StatusOK:
+		err = fmt.Errorf("%w: %s: %s", ErrData, rawurl, resp.Status)
+	}
+	if err != nil {
+		event("bad_status", 0, reader.Result{}, err)
+		return nil, err
+	}
+	if mt, _, _ := mime.ParseMediaType(ct); mt != "text/html" && mt != "application/xhtml+xml" {
+		err = fmt.Errorf("%w: %s is not an HTML page (%s)", ErrData, rawurl, ct)
+		event("not_html", 0, reader.Result{}, err)
+		return nil, err
+	}
+	body, err := io.ReadAll(io.LimitReader(resp.Body, maxBody+1))
+	if err != nil {
+		err = fmt.Errorf("%w: %s", ErrUnavailable, err)
+		event("error", len(body), reader.Result{}, err)
+		return nil, err
+	}
+	if len(body) > maxBody {
+		err = fmt.Errorf("%w: %s is larger than %d bytes", ErrData, rawurl, maxBody)
+		event("too_large", len(body), reader.Result{}, err)
+		return nil, err
+	}
+	res, err := reader.Convert(body, resp.Request.URL.String())
+	if err != nil {
+		err = fmt.Errorf("%w: %s", ErrData, err)
+		event("error", len(body), res, err)
+		return nil, err
+	}
+	if res.Empty {
+		err = fmt.Errorf("%w: %s has no text without JavaScript, which cmarkbrowser does not run", ErrData, rawurl)
+		event("empty", len(body), res, err)
+		return nil, err
+	}
+	event("reader", len(body), res, nil)
+	meta := map[string]any{}
+	if res.Title != "" {
+		meta["title"] = res.Title
+	}
+	return &Page{URL: resp.Request.URL.String(), Meta: meta, Body: res.Markdown, Reader: true}, nil
 }

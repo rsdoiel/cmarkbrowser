@@ -166,6 +166,10 @@ func (m Model) key(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	case s == "enter" && m.focus != 0:
 		m.num = strconv.Itoa(m.focus)
 		return m.follow()
+	case s == "n" && m.num == "":
+		return m.sibling("urlNext", "no next page")
+	case s == "p" && m.num == "":
+		return m.sibling("urlPrev", "no previous page")
 	case s == "b" || s == "left":
 		return m.step(-1)
 	case s == "f" || s == "right":
@@ -174,6 +178,31 @@ func (m Model) key(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	var cmd tea.Cmd
 	m.vp, cmd = m.vp.Update(msg)
 	return m, cmd
+}
+
+// sibling loads the page named by a front matter key (urlNext or urlPrev) of
+// the current page, as a new visit. When the page has no such key, or it is
+// not an address, the status says so and the page stays.
+func (m Model) sibling(key, none string) (tea.Model, tea.Cmd) {
+	m.status = ""
+	if m.view == nil || m.busy {
+		return m, nil
+	}
+	dest := ""
+	if v, ok := m.view.Page.Meta[key]; ok && v != nil {
+		dest = strings.TrimSpace(fmt.Sprint(v))
+	}
+	if dest == "" {
+		m.status = none
+		return m, nil
+	}
+	addr, err := browse.Resolve(m.view.Page.URL, dest)
+	if err != nil {
+		m.status = err.Error()
+		return m, nil
+	}
+	m.busy, m.status = true, "loading "+addr
+	return m, m.load(addr, -1)
 }
 
 // focusable returns the links whose markers were found in the rendered text.
@@ -289,7 +318,16 @@ func (m Model) View() tea.View {
 		}
 		title += "  " + m.view.Page.URL
 	}
-	foot := "Tab focus link  Enter follow  b back  f forward  q quit"
+	foot := "Tab focus link  Enter follow  b back  f forward"
+	if m.view != nil {
+		if v := m.view.Page.URLPrev(); v != "" {
+			foot += "  p prev"
+		}
+		if v := m.view.Page.URLNext(); v != "" {
+			foot += "  n next"
+		}
+	}
+	foot += "  q quit"
 	switch {
 	case m.status != "":
 		foot = m.status

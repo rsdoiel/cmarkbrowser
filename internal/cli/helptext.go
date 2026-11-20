@@ -30,7 +30,8 @@ from /.well-known/toc.opml.
 
 In the browser, Tab and Shift-Tab move between links (the focused link's
 address is shown at the bottom) and Enter follows it. Or type a link's number
-and press Enter. b and f go back and forward; Esc clears a typed number or the
+and press Enter. b and f go back and forward; n and p open the next and
+previous page that the page names in its urlNext and urlPrev front matter; Esc clears a typed number or the
 focus; arrows, PgUp, PgDn, space, g and G scroll; q quits.
 
 # OPTIONS

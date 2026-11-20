@@ -14,9 +14,11 @@ import (
 func site(t *testing.T) *httptest.Server {
 	t.Helper()
 	pages := map[string]string{
-		"/a.md": "---\ntitle: Page A\n---\n# Alpha\n\nGo to [b](b.md) or [c](c.md).\n",
-		"/b.md": "---\ntitle: Page B\n---\n# Beta\n\n[home](a.md)\n",
-		"/c.md": "# Gamma\n",
+		"/a.md":   "---\ntitle: Page A\n---\n# Alpha\n\nGo to [b](b.md) or [c](c.md).\n",
+		"/b.md":   "---\ntitle: Page B\n---\n# Beta\n\n[home](a.md)\n",
+		"/c.md":   "# Gamma\n",
+		"/s/1.md": "---\ntitle: One\nurlNext: 2.md\n---\n# Story One\n",
+		"/s/2.md": "---\ntitle: Two\nurlPrev: 1.md\nurlNext: /c.md\n---\n# Story Two\n",
 	}
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		body, ok := pages[r.URL.Path]
@@ -289,5 +291,51 @@ func TestResizeKeepsTheFocus(t *testing.T) {
 	m = next.(Model)
 	if m.focus != 2 || !strings.Contains(m.View().Content, "\x1b[7m[2]") {
 		t.Errorf("focus %d lost after resize", m.focus)
+	}
+}
+
+func TestNextAndPreviousFollowFrontMatter(t *testing.T) {
+	srv := site(t)
+	m := New(srv.URL+"/s/1.md", render.Glamour{Style: "notty"})
+	m = drive(t, m, m.Init())
+	next, _ := m.Update(tea.WindowSizeMsg{Width: 80, Height: 24})
+	m = next.(Model)
+	m = press(t, m, "n") // relative urlNext
+	if !strings.Contains(m.View().Content, "Story Two") {
+		t.Fatalf("after n:\n%s", m.View().Content)
+	}
+	m = press(t, m, "p") // relative urlPrev
+	if !strings.Contains(m.View().Content, "Story One") {
+		t.Fatalf("after p:\n%s", m.View().Content)
+	}
+	m = press(t, m, "n", "n") // absolute-path urlNext on page two
+	if !strings.Contains(m.View().Content, "Gamma") {
+		t.Fatalf("after n n:\n%s", m.View().Content)
+	}
+	// they are visits: back returns to where we were
+	m = press(t, m, "b")
+	if !strings.Contains(m.View().Content, "Story Two") {
+		t.Errorf("back after next:\n%s", m.View().Content)
+	}
+}
+
+func TestNextWithoutKeyShowsStatusAndKeepsPage(t *testing.T) {
+	m, _ := open(t)
+	m = press(t, m, "n")
+	out := m.View().Content
+	if !strings.Contains(out, "Alpha") || !strings.Contains(out, "no next page") {
+		t.Errorf("view:\n%s", out)
+	}
+	m = press(t, m, "p")
+	if !strings.Contains(m.View().Content, "no previous page") {
+		t.Errorf("view:\n%s", m.View().Content)
+	}
+}
+
+func TestPreviousNextDoNotInterruptATypedNumber(t *testing.T) {
+	m, _ := open(t)
+	m = press(t, m, "1", "n") // while typing a number, n is not a command
+	if strings.Contains(m.View().Content, "no next page") {
+		t.Errorf("n acted while a number was being typed:\n%s", m.View().Content)
 	}
 }

@@ -13,9 +13,11 @@
 //   - A group with no type and no url (antenna's Pages, Posts) is a list of its
 //     own: arrows stop at its ends. Outlines of another kind (calendarYear and
 //     the like, as in Dave's file) belong to the list around them.
-//   - A list with calendar outlines in it is newest first, so the previous page
-//     is the next line down (the older one) and the next page is the line
-//     above. In any other list the previous page is the line above.
+//   - A list with calendar outlines in it is newest first, unless the numbers
+//     in their name attributes run upward (antenna writes oldest first). Newest
+//     first, the previous page is the next line down (the older one) and the
+//     next page is the line above. In any other list the previous page is the
+//     line above.
 //
 // What BonBon itself does with the lines of an outline, for its own arrows, is
 // not documented and could not be tested.
@@ -27,6 +29,7 @@ import (
 	"fmt"
 	"io"
 	"net/url"
+	"strconv"
 	"strings"
 )
 
@@ -37,9 +40,9 @@ type Entry struct {
 }
 
 type node struct {
-	text, typ, url string // url is absolute, "" when none
-	include        bool   // type="include": url is another outline, not a page
-	children       []*node
+	text, typ, name, url string // url is absolute, "" when none
+	include              bool   // type="include": url is another outline, not a page
+	children             []*node
 }
 
 // Doc is a parsed table of contents.
@@ -50,6 +53,7 @@ type Doc struct {
 type xmlOutline struct {
 	Text     string       `xml:"text,attr"`
 	Type     string       `xml:"type,attr"`
+	Name     string       `xml:"name,attr"`
 	URL      string       `xml:"url,attr"`
 	Children []xmlOutline `xml:"outline"`
 }
@@ -92,7 +96,7 @@ func Parse(src []byte, base string) (*Doc, error) {
 	build = func(xs []xmlOutline) []*node {
 		var out []*node
 		for _, x := range xs {
-			n := &node{text: x.Text, typ: x.Type, include: strings.EqualFold(x.Type, "include")}
+			n := &node{text: x.Text, typ: x.Type, name: x.Name, include: strings.EqualFold(x.Type, "include")}
 			if a := strings.TrimSpace(x.URL); a != "" {
 				if ref, err := url.Parse(a); err == nil {
 					n.url = b.ResolveReference(ref).String()
@@ -122,26 +126,57 @@ func isCalendar(typ string) bool {
 	return false
 }
 
+// calendarOrder says which way the calendar outlines around c run, from the
+// numbers in the name attributes of c's siblings of the same type: -1 when they
+// rise (2025 then 2026: oldest first, as antenna writes since BonBon reads the
+// lines downward, antennaApp DR-0013 amendment), +1 when they fall (Dave
+// Winer's newest first), 0 when there are not two different numbers to compare.
+func calendarOrder(parent, c *node) int {
+	prev := -1
+	for _, sib := range parent.children {
+		if sib.typ != c.typ {
+			continue
+		}
+		v, err := strconv.Atoi(strings.TrimSpace(sib.name))
+		if err != nil {
+			continue
+		}
+		if prev >= 0 && v != prev {
+			if v < prev {
+				return 1
+			}
+			return -1
+		}
+		prev = v
+	}
+	return 0
+}
+
 // leaves lists the pages of the outline in document order.
 func (d *Doc) leaves() []leaf {
 	var out []leaf
-	var walk func(n, scope *node, reverse bool)
-	walk = func(n, scope *node, reverse bool) {
+	// dir is the order a level of calendar outlines settled on, which the levels
+	// below it that cannot tell for themselves (one month in a year) inherit.
+	var walk func(n, scope *node, reverse bool, dir int)
+	walk = func(n, scope *node, reverse bool, dir int) {
 		for _, c := range n.children {
-			childScope, childReverse := scope, reverse
+			childScope, childReverse, childDir := scope, reverse, dir
 			if c.typ == "" && c.url == "" && !c.include && len(c.children) > 0 {
-				childScope, childReverse = c, false // a plain group is a list of its own
+				childScope, childReverse, childDir = c, false, 0 // a plain group is a list of its own
 			}
 			if isCalendar(c.typ) {
-				childReverse = true
+				if d := calendarOrder(n, c); d != 0 {
+					childDir = d
+				}
+				childReverse = childDir != -1 // undecided: Dave's newest first
 			}
 			if c.url != "" && len(c.children) == 0 && !c.include {
 				out = append(out, leaf{Entry: Entry{Text: c.text, URL: c.url}, scope: childScope, reverse: childReverse, key: Key(c.url)})
 			}
-			walk(c, childScope, childReverse)
+			walk(c, childScope, childReverse, childDir)
 		}
 	}
-	walk(d.root, d.root, false)
+	walk(d.root, d.root, false, 0)
 	return out
 }
 

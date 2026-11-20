@@ -248,3 +248,42 @@ func TestBadDocuments(t *testing.T) {
 		t.Errorf("an empty outline is a document with no entries, not an error: %v", err)
 	}
 }
+
+// antenna writes Posts oldest first since the BonBon source showed BonBon reads
+// the lines downward (antennaApp DR-0013 amendment). The direction is read from
+// the numbers in the calendar outlines' name attributes.
+const oldestFirstTOC = `<opml version="2.0"><body><outline text="Posts">
+	<outline text="2025" type="calendarYear" name="2025">
+		<outline text="December 2025" type="calendarMonth" name="12">
+			<outline text="Old" url="http://x.example/o.md"/></outline></outline>
+	<outline text="2026" type="calendarYear" name="2026">
+		<outline text="October 2026" type="calendarMonth" name="10">
+			<outline text="Mid" url="http://x.example/m.md"/></outline>
+		<outline text="November 2026" type="calendarMonth" name="11">
+			<outline text="New" url="http://x.example/n.md"/></outline></outline>
+</outline></body></opml>`
+
+func TestOldestFirstPostsAreReadAsOldestFirst(t *testing.T) {
+	d := mustParse(t, oldestFirstTOC, "http://x.example/.well-known/toc.opml")
+	for page, want := range map[string][2]string{
+		"http://x.example/o.md": {"", "http://x.example/m.md"},
+		"http://x.example/m.md": {"http://x.example/o.md", "http://x.example/n.md"},
+		"http://x.example/n.md": {"http://x.example/m.md", ""},
+	} {
+		prev, next, ok := nb(t, d, page)
+		if !ok || prev != want[0] || next != want[1] {
+			t.Errorf("%s: prev %q next %q ok %v, want %q and %q", page, prev, next, ok, want[0], want[1])
+		}
+	}
+}
+
+// With one year and one month the names say nothing, so Dave's newest first stands.
+func TestWithNothingToCompareCalendarsAreNewestFirst(t *testing.T) {
+	src := `<opml version="2.0"><body><outline text="Posts"><outline text="2026" type="calendarYear" name="2026">
+		<outline text="November 2026" type="calendarMonth" name="11">
+		<outline text="A" url="http://x.example/a.md"/><outline text="B" url="http://x.example/b.md"/></outline></outline></outline></body></opml>`
+	d := mustParse(t, src, "http://x.example/.well-known/toc.opml")
+	if prev, next, _ := nb(t, d, "http://x.example/a.md"); prev != "http://x.example/b.md" || next != "" {
+		t.Errorf("prev %q next %q", prev, next)
+	}
+}

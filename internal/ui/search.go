@@ -1,12 +1,14 @@
 package ui
 
 import (
+	"context"
 	"fmt"
 	"strings"
 	"time"
 	"unicode/utf8"
 
 	tea "charm.land/bubbletea/v2"
+	"github.com/rsdoiel/cmarkbrowser/internal/debuglog"
 	"github.com/rsdoiel/cmarkbrowser/internal/search"
 )
 
@@ -165,4 +167,9 @@ func (m *Model) show(note string) {
 	m.refresh()
 	m.status = fmt.Sprintf("match %d of %d%s  /%s", m.cur+1, len(m.matches), note, m.pattern)
 	m.log.Event("match", "n", m.cur+1, "of", len(m.matches), "line", line)
+}
+
+// contextWith returns a background context that carries the debug logger.
+func contextWith(l *debuglog.Logger) context.Context {
+	return debuglog.WithContext(context.Background(), l)
 }

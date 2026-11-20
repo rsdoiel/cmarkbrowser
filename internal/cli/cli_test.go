@@ -272,3 +272,53 @@ func TestDumpOfAnHTMLPageUsesReaderViewAndSaysSo(t *testing.T) {
 		t.Errorf("the note is on stdout: %q", out)
 	}
 }
+
+func TestDumpOfALocalFile(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "notes.md")
+	os.WriteFile(path, []byte("---\ntitle: N\n---\n# Local notes\n\n[a link](https://example.org/x)\n"), 0o644)
+	code, out, errs := run("-dump", "-style", "notty", path)
+	if code != ExitOK || !strings.Contains(out, "Local notes") || !strings.Contains(out, "https://example.org/x") {
+		t.Errorf("exit %d\nstdout %q\nstderr %q", code, out, errs)
+	}
+}
+
+func TestLocalFileFailuresHaveTheRightExitCodes(t *testing.T) {
+	dir := t.TempDir()
+	if code, _, errs := run("-dump", filepath.Join(dir, "missing.md")); code != ExitNoInput {
+		t.Errorf("missing file: exit %d (%s), want 66", code, errs)
+	}
+	if code, _, errs := run("-dump", dir); code != ExitData {
+		t.Errorf("a directory: exit %d (%s), want 65", code, errs)
+	}
+}
+
+func TestBookmarksFlagTakesAFileName(t *testing.T) {
+	if code, _, _ := run("-dump", "-bookmarks"); code != ExitUsage {
+		t.Errorf("-bookmarks with no value: exit %d, want 2", code)
+	}
+	path := filepath.Join(t.TempDir(), "n.md")
+	os.WriteFile(path, []byte("# hi\n"), 0o644)
+	if code, _, errs := run("-dump", "-style", "notty", "-bookmarks", filepath.Join(t.TempDir(), "b.md"), path); code != ExitOK {
+		t.Errorf("exit %d: %s", code, errs)
+	}
+}
+
+func TestHelpDocumentsBookmarksAndSearch(t *testing.T) {
+	_, out, _ := run("-h")
+	for _, want := range []string{"-bookmarks FILE", "m adds", "B opens", "/ searches"} {
+		if !strings.Contains(out, want) {
+			t.Errorf("help lacks %q", want)
+		}
+	}
+}
+
+// A page from the network is reached with -dump by address only; an address
+// that names a file: is not read.
+func TestDumpRefusesAFileAddress(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "secret.md")
+	os.WriteFile(path, []byte("# TOP SECRET\n"), 0o644)
+	code, out, _ := run("-dump", "file://"+path)
+	if code == ExitOK || strings.Contains(out, "SECRET") {
+		t.Errorf("exit %d, stdout %q: a file: address was read", code, out)
+	}
+}

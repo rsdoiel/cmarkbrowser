@@ -65,6 +65,11 @@ type Model struct {
 	cur         int            // index of the current match
 	marked      *search.Marked // the page with the matches marked, for the focus in markedFocus
 	markedFocus int
+
+	// bookmarks and local files
+	bmPath     string          // the bookmarks file, "" for bookmarks.md
+	localStart bool            // the start argument is a file the person named
+	localOK    map[string]bool // file addresses the person opened; a link never adds to it
 }
 
 /** New returns a browser that opens start when it runs.
@@ -80,7 +85,7 @@ type Model struct {
  *   m := ui.New("https://x.org/a.md", render.Glamour{Style: "dark"})
  */
 func New(start string, r render.Renderer) Model {
-	return Model{r: r, start: start, idx: -1, w: 80, h: 24, vp: viewport.New(viewport.WithWidth(80), viewport.WithHeight(22))}
+	return Model{r: r, start: start, idx: -1, w: 80, h: 24, localOK: map[string]bool{}, vp: viewport.New(viewport.WithWidth(80), viewport.WithHeight(22))}
 }
 
 /** WithDebug returns the browser with a debug logger: every key, load, status
@@ -105,12 +110,20 @@ func (m Model) WithDebug(l *debuglog.Logger) Model {
 func (m Model) width() int { return min(max(m.w, 20), maxWidth) }
 
 // Init loads the start page.
-func (m Model) Init() tea.Cmd { return m.load(m.start, -1, "start") }
+func (m Model) Init() tea.Cmd {
+	if m.localStart {
+		return m.loadFile(m.start, -1, "start")
+	}
+	return m.load(m.start, -1, "start")
+}
 
 // load fetches addr; idx is the history index to move to, or -1 to add an
 // entry; why says what asked for it (start, link, history, next, prev) for the
 // debug log.
 func (m Model) load(addr string, idx int, why string) tea.Cmd {
+	if isFileAddr(addr) {
+		return m.openFileAddr(addr, idx, why)
+	}
 	r, width, log := m.r, m.width(), m.log
 	log.Event("load.start", "addr", addr, "idx", idx, "why", why)
 	return func() tea.Msg {
@@ -221,6 +234,10 @@ func (m Model) key(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		}
 		m.num, m.status = "", ""
 		return m, nil
+	case s == "m" && m.num == "":
+		return m.mark(), nil
+	case s == "B" && m.num == "":
+		return m.openBookmarks()
 	case s == "/" && m.num == "":
 		return m.openPrompt(), nil
 	case s == "n" && m.num == "":
@@ -406,7 +423,7 @@ func (m Model) View() tea.View {
 			title += "  [HTML, reader view]"
 		}
 	}
-	foot := "Tab focus link  Enter follow  / search  b back  f forward"
+	foot := "Tab focus link  Enter follow  / search  m bookmark  B bookmarks  b back  f forward"
 	if m.view != nil {
 		if v := m.view.Page.URLPrev(); v != "" {
 			foot += "  [ prev"

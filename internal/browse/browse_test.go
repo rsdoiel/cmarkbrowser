@@ -6,6 +6,8 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -317,5 +319,32 @@ func TestOpenLogsThatItUsedReaderView(t *testing.T) {
 	}
 	if !strings.Contains(buf.String(), `"reader":true`) {
 		t.Errorf("open event does not say reader:\n%s", buf.String())
+	}
+}
+
+func TestOpenFileShowsALocalMarkdownFile(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "list.md")
+	os.WriteFile(path, []byte("---\ntitle: List\n---\n# Reading\n\n- [one](https://example.org/one)\n- [rel](other.md)\n"), 0o644)
+	v, err := OpenFile(context.Background(), path, render.Glamour{Style: "notty"}, 80)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if v.Page.Title() != "List" || !strings.Contains(v.Text, "Reading") {
+		t.Errorf("view %+v\n%s", v.Page, v.Text)
+	}
+	if len(v.Links) != 2 || v.Links[0].URL != "https://example.org/one" {
+		t.Errorf("links %#v", v.Links)
+	}
+	if !strings.HasPrefix(v.Links[1].URL, "file://") {
+		t.Errorf("a relative link in a local file resolves against the file: %q", v.Links[1].URL)
+	}
+}
+
+func TestOpenFileGetsTheSameMacrosAsAPage(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "m.md")
+	os.WriteFile(path, []byte("---\ntitle: T\n---\n# {{page.title}}\n"), 0o644)
+	v, err := OpenFile(context.Background(), path, render.Glamour{Style: "notty"}, 80)
+	if err != nil || !strings.Contains(v.Text, "T") || strings.Contains(v.Text, "{{") {
+		t.Errorf("a local Markdown file gets the same macros as a page: %v\n%s", err, v.Text)
 	}
 }

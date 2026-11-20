@@ -91,7 +91,6 @@ func Resolve(base, dest string) (string, error) {
  *   v, err := browse.Open(ctx, "https://x.org/a.md", render.Glamour{}, 80)
  */
 func Open(ctx context.Context, addr string, r render.Renderer, width int) (*View, error) {
-	log := debuglog.FromContext(ctx)
 	t0 := time.Now()
 	p, err := page.Fetch(ctx, addr)
 	if err != nil && page.IsHTML(err) {
@@ -102,6 +101,39 @@ func Open(ctx context.Context, addr string, r render.Renderer, width int) (*View
 	if err != nil {
 		return nil, err
 	}
+	return build(ctx, addr, p, r, width, t0)
+}
+
+/** OpenFile shows a local Markdown file the way Open shows a page. It is only
+ * for a file the person named (the start argument, the bookmarks file); links
+ * are never opened through it.
+ *
+ * Parameters:
+ *   ctx (context.Context) — carries the debug logger
+ *   path (string) — the file
+ *   r (render.Renderer) — the renderer
+ *   width (int) — columns to wrap to
+ *
+ * Returns:
+ *   *View — the page ready to show
+ *   error — from page.ReadFile, or the renderer
+ *
+ * Example:
+ *   v, err := browse.OpenFile(ctx, "bookmarks.md", render.Glamour{}, 80)
+ */
+func OpenFile(ctx context.Context, path string, r render.Renderer, width int) (*View, error) {
+	t0 := time.Now()
+	p, err := page.ReadFile(path)
+	if err != nil {
+		return nil, err
+	}
+	return build(ctx, path, p, r, width, t0)
+}
+
+// build expands, prepares and renders a fetched page and numbers its links. t0
+// is when fetching began, for the debug log.
+func build(ctx context.Context, addr string, p *page.Page, r render.Renderer, width int, t0 time.Time) (*View, error) {
+	log := debuglog.FromContext(ctx)
 	t1 := time.Now()
 	body, missing := p.Body, []string(nil)
 	if !p.Reader { // {{page.NAME}} macros are Markdown-web front matter, not HTML text

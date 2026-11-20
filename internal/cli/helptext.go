@@ -17,9 +17,9 @@ const HelpText = `%{app_name}(1) user manual | version {version} {release_hash}
 
 # SYNOPSIS
 
-{app_name} [OPTIONS] [URL]
+{app_name} [OPTIONS] [URL|FILE]
 
-{app_name} -dump [-style NAME] [-width N] [-debug FILE] URL
+{app_name} -dump [-style NAME] [-width N] [-debug FILE] URL|FILE
 
 # DESCRIPTION
 
@@ -46,6 +46,21 @@ words, so a phrase is found even where the screen wrapped it, and a match never
 runs from one paragraph into the next. / then Enter on an empty prompt repeats
 the last search. A search belongs to the page it was run on.
 
+m adds the page being shown to a bookmarks file and B opens it. The file is
+ordinary Markdown (bookmarks.md in the working directory, or the file named by
+-bookmarks FILE): a list with a link and the date for each page, created with a
+"# Bookmarks" heading when it is missing and never rewritten, only added to. A
+page already in it is not added twice. Open it with B, or give it as the
+argument, and follow its links like any page; b comes back to it. Edit it by
+hand if you like.
+
+Given a file name instead of an address, {app_name} shows that file. Local
+files are opened only that way, and through B: a link in a page, whatever it
+says, never opens one.
+
+A link to an HTML page that has no Markdown copy is shown in reader view: its
+text, links and pictures that have alt text, without scripts, styles or menus.
+
 # OPTIONS
 
 -h, -help
@@ -62,6 +77,9 @@ the last search. A search belongs to the page it was run on.
 
 -width N
 : Columns to wrap to (default 80).
+
+-bookmarks FILE
+: The Markdown file that m adds to and B opens (default bookmarks.md).
 
 -debug FILE
 : Append a log of the session to FILE, one JSON object per line: every key
@@ -84,10 +102,11 @@ the last search. A search belongs to the page it was run on.
 : Bad command line.
 
 65
-: The page is not Markdown, or its front matter is not valid.
+: The page is not Markdown (and not HTML), its front matter is not valid, or
+  the file named is a directory or not text.
 
 66
-: The page is not there (404 or 410).
+: The page is not there (404 or 410), or the file named does not exist.
 
 69
 : The server cannot be reached.

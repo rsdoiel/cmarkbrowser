@@ -7,6 +7,7 @@ import (
 	"io"
 	"os"
 	"runtime"
+	"strings"
 
 	tea "charm.land/bubbletea/v2"
 	"golang.org/x/term"
@@ -14,6 +15,7 @@ import (
 	cmarkbrowser "github.com/rsdoiel/cmarkbrowser"
 	"github.com/rsdoiel/cmarkbrowser/internal/browse"
 	"github.com/rsdoiel/cmarkbrowser/internal/debuglog"
+	"github.com/rsdoiel/cmarkbrowser/internal/page"
 	"github.com/rsdoiel/cmarkbrowser/internal/render"
 	"github.com/rsdoiel/cmarkbrowser/internal/ui"
 )
@@ -36,7 +38,7 @@ const appName = "cmarkbrowser"
  */
 func Run(args []string, stdout, stderr io.Writer) int {
 	var showHelp, showLicense, showVersion, dump bool
-	var style, debugPath string
+	var style, debugPath, bookmarksPath string
 	var width int
 	fs := flag.NewFlagSet(appName, flag.ContinueOnError)
 	fs.SetOutput(io.Discard)
@@ -50,6 +52,7 @@ func Run(args []string, stdout, stderr io.Writer) int {
 	fs.StringVar(&style, "style", "dark", "glamour style: dark, light, notty, ascii")
 	fs.IntVar(&width, "width", 80, "columns to wrap to")
 	fs.StringVar(&debugPath, "debug", "", "write a JSON-lines log of the session to this file")
+	fs.StringVar(&bookmarksPath, "bookmarks", "", "the Markdown file m adds to and B opens (default bookmarks.md)")
 	if err := fs.Parse(args); err != nil {
 		return fail(stderr, fmt.Errorf("%w: %s", ErrUsage, err))
 	}
@@ -93,12 +96,23 @@ func Run(args []string, stdout, stderr io.Writer) int {
 		log.Event("start", "schema", 1, "version", cmarkbrowser.Version, "hash", cmarkbrowser.ReleaseHash,
 			"mode", mode, "args", args, "goos", runtime.GOOS, "goarch", runtime.GOARCH, "pid", os.Getpid())
 	}
+	// An argument with no scheme is a file the person named; an address needs
+	// http:// or https://. Links never open files (page.Fetch refuses them).
+	local := !strings.Contains(fs.Arg(0), "://")
 	var code int
 	if dump {
 		ctx := debuglog.WithContext(context.Background(), log)
-		code = runDump(ctx, fs.Arg(0), render.Glamour{Style: style}, width, stdout, stderr)
+		code = runDump(ctx, fs.Arg(0), local, render.Glamour{Style: style}, width, stdout, stderr)
 	} else {
-		model := ui.New(fs.Arg(0), render.Glamour{Style: style}).WithDebug(log)
+		model := ui.New(fs.Arg(0), render.Glamour{Style: style}).WithDebug(log).WithBookmarks(bookmarksPath)
+		if local {
+			if _, err := os.Stat(fs.Arg(0)); err != nil {
+				code = fail(stderr, fmt.Errorf("%w: %s (an address starts with http:// or https://)", page.ErrNoInput, err))
+				log.Event("exit", "code", code)
+				return code
+			}
+			model = model.WithLocalStart()
+		}
 		if _, err := tea.NewProgram(model).Run(); err != nil {
 			code = fail(stderr, err)
 		}
@@ -107,9 +121,16 @@ func Run(args []string, stdout, stderr io.Writer) int {
 	return code
 }
 
-// runDump prints a rendered page, then its numbered links.
-func runDump(ctx context.Context, addr string, r render.Renderer, width int, stdout, stderr io.Writer) int {
-	v, err := browse.Open(ctx, addr, r, width)
+// runDump prints a rendered page, then its numbered links. A local file is
+// read only when the person named it on the command line.
+func runDump(ctx context.Context, arg string, local bool, r render.Renderer, width int, stdout, stderr io.Writer) int {
+	var v *browse.View
+	var err error
+	if local {
+		v, err = browse.OpenFile(ctx, arg, r, width)
+	} else {
+		v, err = browse.Open(ctx, arg, r, width)
+	}
 	if err != nil {
 		return fail(stderr, err)
 	}

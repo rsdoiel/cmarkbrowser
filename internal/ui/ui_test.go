@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -729,5 +731,184 @@ func TestTheTitleLineMarksAReaderView(t *testing.T) {
 	}
 	if !strings.Contains(m.View().Content, "HTML words") {
 		t.Errorf("page not shown:\n%s", m.View().Content)
+	}
+}
+
+// bookmarkSite serves a Markdown page and an HTML page with no Markdown copy.
+func bookmarkSite(t *testing.T, secretPath string) *httptest.Server {
+	t.Helper()
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/page.md":
+			w.Header().Set("Content-Type", "text/markdown")
+			fmt.Fprint(w, "---\ntitle: A Good Page\n---\n# Good\n\nbody\n")
+		case "/other.md":
+			w.Header().Set("Content-Type", "text/markdown")
+			fmt.Fprint(w, "# Other page\n")
+		case "/html":
+			w.Header().Set("Content-Type", "text/html")
+			fmt.Fprint(w, `<html><head><title>An HTML Page</title></head><body><article><h1>An HTML Page</h1><p>`+strings.Repeat("Words here. ", 30)+`</p></article></body></html>`)
+		case "/evil.md":
+			w.Header().Set("Content-Type", "text/markdown")
+			fmt.Fprintf(w, "# Evil\n\n[read me](file://%s)\n[and me](%s)\n", secretPath, secretPath)
+		}
+	}))
+	t.Cleanup(srv.Close)
+	return srv
+}
+
+func openBM(t *testing.T, start string, bm string) Model {
+	t.Helper()
+	m := New(start, render.Glamour{Style: "notty"}).WithBookmarks(bm)
+	m = drive(t, m, m.Init())
+	next, _ := m.Update(tea.WindowSizeMsg{Width: 100, Height: 24})
+	return next.(Model)
+}
+
+func TestMBookmarksThePageAndNotTwice(t *testing.T) {
+	srv := bookmarkSite(t, "")
+	bm := filepath.Join(t.TempDir(), "bookmarks.md")
+	m := openBM(t, srv.URL+"/page.md", bm)
+	m = press(t, m, "m")
+	if !strings.Contains(m.View().Content, "bookmarked") {
+		t.Errorf("status:\n%s", m.View().Content)
+	}
+	b, err := os.ReadFile(bm)
+	if err != nil || !strings.Contains(string(b), "[A Good Page]("+srv.URL+"/page.md)") {
+		t.Errorf("file %q err %v", b, err)
+	}
+	m = press(t, m, "m")
+	if !strings.Contains(m.View().Content, "already bookmarked") {
+		t.Errorf("status:\n%s", m.View().Content)
+	}
+	if n := strings.Count(mustRead(t, bm), "page.md"); n != 1 {
+		t.Errorf("%d entries", n)
+	}
+}
+
+func mustRead(t *testing.T, p string) string {
+	t.Helper()
+	b, err := os.ReadFile(p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return string(b)
+}
+
+func TestBOpensTheBookmarksAndALinkLeadsOutAndBackReturns(t *testing.T) {
+	srv := bookmarkSite(t, "")
+	bm := filepath.Join(t.TempDir(), "bookmarks.md")
+	m := openBM(t, srv.URL+"/page.md", bm)
+	m = press(t, m, "m", "B")
+	out := m.View().Content
+	if !strings.Contains(out, "Bookmarks") || !strings.Contains(out, "A Good Page") {
+		t.Fatalf("bookmarks page:\n%s", out)
+	}
+	if first := strings.SplitN(out, "\n", 2)[0]; !strings.Contains(first, "bookmarks.md") {
+		t.Errorf("title line %q should name the file", first)
+	}
+	m = press(t, m, "1", "enter") // follow the bookmark
+	if !strings.Contains(m.View().Content, "Good") {
+		t.Fatalf("did not follow the bookmark:\n%s", m.View().Content)
+	}
+	m = press(t, m, "b") // back to the local bookmarks page
+	if !strings.Contains(m.View().Content, "A Good Page") || strings.Contains(m.View().Content, "not an http") {
+		t.Errorf("back to the bookmarks failed:\n%s", m.View().Content)
+	}
+}
+
+func TestBWithNoBookmarksSaysSo(t *testing.T) {
+	srv := bookmarkSite(t, "")
+	m := openBM(t, srv.URL+"/page.md", filepath.Join(t.TempDir(), "none.md"))
+	m = press(t, m, "B")
+	if !strings.Contains(m.View().Content, "no bookmarks") || !strings.Contains(m.View().Content, "Good") {
+		t.Errorf("view:\n%s", m.View().Content)
+	}
+}
+
+func TestMBookmarksAnHTMLPageByItsAddress(t *testing.T) {
+	srv := bookmarkSite(t, "")
+	bm := filepath.Join(t.TempDir(), "b.md")
+	m := openBM(t, srv.URL+"/html", bm)
+	m = press(t, m, "m")
+	b := mustRead(t, bm)
+	if !strings.Contains(b, "[An HTML Page]("+srv.URL+"/html)") {
+		t.Errorf("file:\n%s", b)
+	}
+}
+
+func TestAWriteFailureIsShownNotFatal(t *testing.T) {
+	srv := bookmarkSite(t, "")
+	m := openBM(t, srv.URL+"/page.md", filepath.Join(t.TempDir(), "no", "such", "dir", "b.md"))
+	m = press(t, m, "m")
+	if out := m.View().Content; !strings.Contains(out, "bookmark failed") || !strings.Contains(out, "Good") {
+		t.Errorf("view:\n%s", out)
+	}
+}
+
+// A page from the network cannot make the browser read a local file.
+func TestARemotePageCannotOpenALocalFile(t *testing.T) {
+	secret := filepath.Join(t.TempDir(), "secret.md")
+	os.WriteFile(secret, []byte("# TOP SECRET CONTENT\n"), 0o644)
+	srv := bookmarkSite(t, secret)
+	m := openBM(t, srv.URL+"/evil.md", filepath.Join(t.TempDir(), "b.md"))
+	for _, n := range []string{"1", "2"} {
+		m = press(t, m, n, "enter")
+		out := m.View().Content
+		if strings.Contains(out, "TOP SECRET") {
+			t.Fatalf("link %s read a local file:\n%s", n, out)
+		}
+		// link 1 is a file: address and is refused, so the page stays; link 2 is a
+		// bare path, which is an ordinary address on the same server
+		if n == "1" && (!strings.Contains(out, "Evil") || !strings.Contains(out, "local files")) {
+			t.Errorf("a file: link should be refused with a message and the page kept:\n%s", out)
+		}
+	}
+}
+
+func TestLocalFilesAreNotBookmarked(t *testing.T) {
+	bm := filepath.Join(t.TempDir(), "bookmarks.md")
+	srv := bookmarkSite(t, "")
+	m := openBM(t, srv.URL+"/page.md", bm)
+	m = press(t, m, "m", "B") // now showing the local bookmarks file
+	m = press(t, m, "m")
+	if !strings.Contains(m.View().Content, "local file") {
+		t.Errorf("view:\n%s", m.View().Content)
+	}
+	if strings.Count(mustRead(t, bm), "](") != 1 {
+		t.Errorf("a local file was bookmarked:\n%s", mustRead(t, bm))
+	}
+}
+
+func TestAStartFileIsLocalAndHistoryCanReturnToIt(t *testing.T) {
+	srv := bookmarkSite(t, "")
+	notes := filepath.Join(t.TempDir(), "notes.md")
+	os.WriteFile(notes, []byte("---\ntitle: Notes\n---\n# My notes\n\n[the page]("+srv.URL+"/other.md)\n"), 0o644)
+	m := New(notes, render.Glamour{Style: "notty"}).WithLocalStart().WithBookmarks(filepath.Join(t.TempDir(), "b.md"))
+	m = drive(t, m, m.Init())
+	next, _ := m.Update(tea.WindowSizeMsg{Width: 100, Height: 24})
+	m = next.(Model)
+	if !strings.Contains(m.View().Content, "My notes") {
+		t.Fatalf("start file not shown:\n%s", m.View().Content)
+	}
+	m = press(t, m, "1", "enter")
+	if !strings.Contains(m.View().Content, "Other page") {
+		t.Fatalf("link not followed:\n%s", m.View().Content)
+	}
+	m = press(t, m, "b")
+	if !strings.Contains(m.View().Content, "My notes") {
+		t.Errorf("did not return to the start file:\n%s", m.View().Content)
+	}
+}
+
+func TestBookmarkIsLogged(t *testing.T) {
+	srv := bookmarkSite(t, "")
+	var buf bytes.Buffer
+	m := New(srv.URL+"/page.md", render.Glamour{Style: "notty"}).WithBookmarks(filepath.Join(t.TempDir(), "b.md")).WithDebug(debuglog.New(&buf))
+	m = drive(t, m, m.Init())
+	next, _ := m.Update(tea.WindowSizeMsg{Width: 100, Height: 24})
+	press(t, next.(Model), "m")
+	if !strings.Contains(buf.String(), `"event":"bookmark"`) || !strings.Contains(buf.String(), `"added":true`) {
+		t.Errorf("log:\n%s", buf.String())
 	}
 }

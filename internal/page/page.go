@@ -11,7 +11,9 @@ import (
 	"mime"
 	"net/http"
 	"net/url"
+	"os"
 	"path"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -548,4 +550,55 @@ func FetchReader(ctx context.Context, rawurl string) (*Page, error) {
 		meta["title"] = res.Title
 	}
 	return &Page{URL: resp.Request.URL.String(), Meta: meta, Body: res.Markdown, Reader: true}, nil
+}
+
+/** ReadFile reads a local Markdown file as a page. It is only for a file the
+ * person named: the program's start argument and the bookmarks file. Fetch,
+ * the way every link is followed, refuses file addresses, so a page from the
+ * network can never make the browser read a local file.
+ *
+ * Parameters:
+ *   path (string) — the file, absolute or relative to the working directory
+ *
+ * Returns:
+ *   *Page — the page; its URL is the file:// address of the file
+ *   error — wraps ErrNoInput (missing or unreadable) or ErrData (a directory, a
+ *     file larger than the cap, a binary file, bad front matter)
+ *
+ * Example:
+ *   p, err := page.ReadFile("bookmarks.md")
+ */
+func ReadFile(path string) (*Page, error) {
+	abs, err := filepath.Abs(path)
+	if err != nil {
+		return nil, fmt.Errorf("%w: %s", ErrNoInput, err)
+	}
+	f, err := os.Open(abs)
+	if err != nil {
+		return nil, fmt.Errorf("%w: %s", ErrNoInput, err)
+	}
+	defer f.Close()
+	info, err := f.Stat()
+	if err != nil {
+		return nil, fmt.Errorf("%w: %s", ErrNoInput, err)
+	}
+	if info.IsDir() {
+		return nil, fmt.Errorf("%w: %s is a directory", ErrData, abs)
+	}
+	body, err := io.ReadAll(io.LimitReader(f, maxBody+1))
+	if err != nil {
+		return nil, fmt.Errorf("%w: %s", ErrNoInput, err)
+	}
+	if len(body) > maxBody {
+		return nil, fmt.Errorf("%w: %s is larger than %d bytes", ErrData, abs, maxBody)
+	}
+	if bytes.IndexByte(body[:min(len(body), 8000)], 0) >= 0 {
+		return nil, fmt.Errorf("%w: %s is not a text file", ErrData, abs)
+	}
+	p, err := Parse(bytes.TrimPrefix(body, []byte("\xef\xbb\xbf")))
+	if err != nil {
+		return nil, err
+	}
+	p.URL = (&url.URL{Scheme: "file", Path: abs}).String()
+	return p, nil
 }

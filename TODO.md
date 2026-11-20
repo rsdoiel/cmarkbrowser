@@ -82,6 +82,15 @@ https://rsdoiel.github.io/blog/index.md and https://rsdoiel.github.io/antenna/in
 - [ ] Collections in an antenna table of contents are a list of their own, so `]` steps between them; antenna's HTML gives collections no arrows (DR-0013 5).
 - [x] (2026-11-20) Read `/.well-known/bonbon.json` for `urlMirrorOf` (see the mirror item above). BonBon ignores `cname`; antenna writes no `bonbon.json` (antennaApp DR-0014).
 - [ ] `urlSearch` from `bonbon.json`: search a site that has a search server (Dave's has one), BonBon appends `?q=` and the word and expects a Markdown results page; a key such as `s` would ask for the query. `urlUpdateSocket` (a websocket watcher) is not planned.
+- [ ] Site search over a local cache (idea, 2026-11-20; `agents/projects/cmarkbrowser/design/site-search-design.md`). The toc lists a site's pages; cache their Markdown in SQLite with an FTS5 index and search it in the browser, so a static site with no `urlSearch` server (antenna sites) can be searched with no JavaScript or WASM. Distinct from in-page search (`internal/search`).
+  - [ ] Decision record (`proposed`): opt-in per site, where the cache lives (with the state-directory item), schema, limits, the SQLite dependency (a pure Go driver such as `modernc.org/sqlite`, FTS5 checked on all six targets; the author decides).
+  - [ ] `internal/sitecache`: store a page (address, title, description, pubDate, body, ETag, Last-Modified, fetched-at), conditional refresh, FTS5 query with `snippet()` and `bm25()`, a person's text quoted so punctuation is never a syntax error. Tests on an in-memory database and a stand-in server.
+  - [ ] Fill from a local site first (`internal/local`; no network); then from a remote toc: same origin only, only toc addresses, one or two requests at a time with a delay, `Retry-After` and back-off on 429 and 5xx, byte and page and total limits, a `User-Agent` naming cmarkbrowser.
+  - [ ] Three fill modes: all at once when the toc lists few pages (ask once, say the count and size), trickle in the background on a large site with a visible "searched N of M pages", and every page the person opens is cached anyway.
+  - [ ] Stay current: conditional requests, re-read the toc each session, drop entries no longer listed, skip pages whose toc date has not changed; commands to refresh and to forget a site.
+  - [ ] UI: `S` asks for the query; the results are an ordinary Markdown page (numbered links, focus, history, bookmarks, `-dump`), saying how much of the site was searched. `-dump -search WORD URL` exits 1 when nothing matches. `-no-cache` records nothing.
+  - [ ] Decide how it coexists with the site's own `urlSearch` (the item above) when both exist.
+  - [ ] Open: a collection's `_items.md` can be megabytes (one document or many); whether the Servo GUI browser shares the cache file; whether a macro is searched as written or expanded.
 - [x] Exit codes per DR-0003: unreachable server 69, bad Markdown or OPML 65, missing page 66. Done: 2, 65, 66, 69, 70, 73, 77; tested in `internal/cli`, documented under EXIT STATUS in the help.
 
 ## Open questions
@@ -113,3 +122,7 @@ https://rsdoiel.github.io/blog/index.md and https://rsdoiel.github.io/antenna/in
 - [x] (2026-11-20) Release prep for v0.0.0, the prototype and proof of concept (author's decision): `codemeta.json` has `datePublished` and `dateModified` 2026-11-20, new `releaseNotes`, `developmentStatus` stays `concept`; from v0.0.1, if development continues, it becomes WIP. `CHANGES.md` written, `make generate` run, README and INSTALL no longer say "not released". Known gaps: no `-help index` and topic pages (author: release without), no config file, no images, no `urlSearch`, Windows and macOS builds never run. `datePublished` must be the release day: if the release slips past 2026-11-20, change it, `make generate`, commit and push before `make check-release`.
 
 - [ ] Images can be turned into links that the local system's previewer can display or display via the default web browser.
+
+- [ ] If I am viewing a remote site page and open the url box and inter a path (full or relative) it is treated as having the current page's prefix hostname. Example, I have cmarkbrowser open to https://rsdoiel.github.io, then I press "o" to open a new url but instead of enter https://rsdoiel.github.io/antenna I just enter antenna the path would be combined with the current pages hostname to form the URL to be retrieved next. The retrieved page would be bookmark-able and in the history because it is still a remote URL.
+
+

@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"github.com/rsdoiel/cmarkbrowser/internal/page"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -300,10 +301,11 @@ func TestOpenShowsAnHTMLPageInReaderView(t *testing.T) {
 	}
 }
 
-func TestOpenStillFailsForWhatIsNeitherMarkdownNorHTML(t *testing.T) {
+func TestAnImageIsANoteAndAMissingPageStillFails(t *testing.T) {
 	srv := htmlSite(t)
-	if _, err := Open(context.Background(), srv.URL+"/image.png", render.Glamour{Style: "notty"}, 80); err == nil {
-		t.Error("an image opened as a page")
+	v, err := Open(context.Background(), srv.URL+"/image.png", render.Glamour{Style: "notty"}, 80)
+	if err != nil || v.Page.Kind != page.KindImage {
+		t.Errorf("an image is noted, not an error: %+v %v", v, err)
 	}
 	if _, err := Open(context.Background(), srv.URL+"/missing", render.Glamour{Style: "notty"}, 80); err == nil {
 		t.Error("a missing page opened")

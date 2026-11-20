@@ -40,6 +40,10 @@ func (m Model) editPage() (tea.Model, tea.Cmd) {
 	}
 	addr := m.view.Page.URL
 	file, inPlace := local.PathOf(addr)
+	if !inPlace && m.view.Page.Raw == "" {
+		m.status = "nothing to edit: this is a note about a file, not its source"
+		return m, nil
+	}
 	if !inPlace {
 		dir, err := edit.DownloadsDir()
 		if err != nil {

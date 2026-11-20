@@ -71,10 +71,14 @@ const maxBody = 8 << 20
  *     copy to edit; empty for a reader view
  */
 type Page struct {
-	URL    string
-	Meta   map[string]any
-	Body   string
-	Raw    string
+	URL  string
+	Meta map[string]any
+	Body string
+	Raw  string
+	// Kind is set for a link that was not Markdown and not HTML: source shown
+	// as text, or a note about an image or a file (FetchOther). "" for Markdown
+	// and for a reader view.
+	Kind   Kind
 	Reader bool // the Body is a reader view of an HTML page, not the page's own Markdown
 }
 

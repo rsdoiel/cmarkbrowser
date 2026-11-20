@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"github.com/rsdoiel/cmarkbrowser/internal/local"
 	"net/url"
+	"path/filepath"
 	"regexp"
 	"strconv"
 	"strings"
@@ -102,7 +103,10 @@ func Resolve(base, dest string) (string, error) {
 func Open(ctx context.Context, addr string, r render.Renderer, width int) (*View, error) {
 	t0 := time.Now()
 	p, err := page.Fetch(ctx, addr)
-	if err != nil && page.IsHTML(err) {
+	if err != nil && page.IsOther(err) {
+		// XML and text show as source, an image or a file as a note (BonBon's rules)
+		p, err = page.FetchOther(ctx, addr)
+	} else if err != nil && page.IsHTML(err) {
 		// An HTML page with no Markdown copy: a link that left the Markdown
 		// web. Show it in reader view instead of stopping.
 		p, err = page.FetchReader(ctx, addr)
@@ -161,7 +165,15 @@ func OpenFile(ctx context.Context, path string, r render.Renderer, width int) (*
  */
 func OpenLocal(ctx context.Context, path string, site *local.Site, r render.Renderer, width int) (*View, error) {
 	t0 := time.Now()
-	p, err := page.ReadFile(path)
+	var p *page.Page
+	var err error
+	switch strings.ToLower(filepath.Ext(path)) {
+	case "", ".md", ".markdown":
+		p, err = page.ReadFile(path)
+	default:
+		// a link to an XML, text, image or other file in the site (BonBon's rules)
+		p, err = page.OtherFromFile(path)
+	}
 	if err != nil {
 		return nil, err
 	}

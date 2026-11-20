@@ -6,6 +6,7 @@ import (
 	"context"
 	"fmt"
 	"github.com/rsdoiel/cmarkbrowser/internal/local"
+	"github.com/rsdoiel/cmarkbrowser/internal/page"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -507,6 +508,14 @@ func (m Model) View() tea.View {
 		title += "  " + shown(m.view.Page.URL)
 		if m.view.Page.Reader {
 			title += "  [HTML, reader view]"
+		}
+		switch m.view.Page.Kind {
+		case page.KindXML, page.KindText:
+			title += "  [source]"
+		case page.KindImage:
+			title += "  [image, not shown]"
+		case page.KindFile:
+			title += "  [file, not downloaded]"
 		}
 	}
 	foot := "Tab focus link  Enter follow  / search  m bookmark  B bookmarks  b back  f forward"

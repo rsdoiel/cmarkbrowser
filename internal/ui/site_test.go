@@ -351,3 +351,98 @@ func TestEOnAReaderViewIsRefused(t *testing.T) {
 		t.Errorf("status %q", m.status)
 	}
 }
+
+// otherLinksSite serves a page with links to things that are not Markdown.
+func otherLinksSite(t *testing.T) *httptest.Server {
+	t.Helper()
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/a.md":
+			w.Header().Set("Content-Type", "text/markdown")
+			fmt.Fprint(w, "# Home\n\n[feed](/feed.xml) [pic](/pic.png) [zip](/a.zip) [json](/d.json)\n")
+		case "/feed.xml":
+			w.Header().Set("Content-Type", "application/rss+xml")
+			fmt.Fprint(w, "<rss><channel><title>Feed Title</title></channel></rss>")
+		case "/pic.png":
+			w.Header().Set("Content-Type", "image/png")
+			w.Write(make([]byte, 100))
+		case "/a.zip":
+			w.Header().Set("Content-Type", "application/zip")
+			w.Write(make([]byte, 100))
+		case "/d.json":
+			w.Header().Set("Content-Type", "application/json")
+			fmt.Fprint(w, `{"key": "value"}`)
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	t.Cleanup(srv.Close)
+	return srv
+}
+
+func TestLinksToXMLAndTextShowTheSourceAndImagesAndFilesAreNoted(t *testing.T) {
+	srv := otherLinksSite(t)
+	hist := filepath.Join(t.TempDir(), "history.md")
+	m := New(srv.URL+"/a.md", render.Glamour{Style: "notty"}).WithHistory(hist)
+	m = drive(t, m, m.Init())
+	m = press(t, m, "1", "enter")
+	out := m.View().Content
+	if !strings.Contains(out, "<rss>") || !strings.Contains(out, "Feed Title") || !strings.Contains(out, "[source]") {
+		t.Errorf("xml:\n%s", out)
+	}
+	m = press(t, m, "b", "2", "enter")
+	out = m.View().Content
+	if !strings.Contains(out, "An image") || !strings.Contains(out, "[image, not shown]") || !strings.Contains(out, srv.URL+"/pic.png") {
+		t.Errorf("image:\n%s", out)
+	}
+	m = press(t, m, "b", "3", "enter")
+	if out = m.View().Content; !strings.Contains(out, "not downloaded") || !strings.Contains(out, "[file, not downloaded]") {
+		t.Errorf("file:\n%s", out)
+	}
+	m = press(t, m, "b", "4", "enter")
+	if out = m.View().Content; !strings.Contains(out, `"key": "value"`) {
+		t.Errorf("json:\n%s", out)
+	}
+	// they are web pages: in the history like any other
+	if b, _ := os.ReadFile(hist); !strings.Contains(string(b), "/feed.xml") {
+		t.Errorf("history:\n%s", b)
+	}
+}
+
+func TestENotesWhatCannotBeEditedAndEditsASourceCopy(t *testing.T) {
+	home := t.TempDir()
+	os.Mkdir(filepath.Join(home, "Downloads"), 0o755)
+	t.Setenv("HOME", home)
+	t.Setenv("USERPROFILE", home)
+	calls := fakeEditor(t, "edited")
+	srv := otherLinksSite(t)
+	m := New(srv.URL+"/a.md", render.Glamour{Style: "notty"})
+	m = drive(t, m, m.Init())
+	m = press(t, m, "2", "enter", "e") // an image
+	if !strings.Contains(m.status, "nothing to edit") || len(*calls) != 0 {
+		t.Errorf("status %q calls %v", m.status, *calls)
+	}
+	m = press(t, m, "b", "1", "enter", "e") // XML source
+	if len(*calls) != 1 || filepath.Base((*calls)[0]) != "feed.xml" {
+		t.Errorf("calls %v", *calls)
+	}
+}
+
+func TestALocalSiteShowsXMLTextImagesAndFilesToo(t *testing.T) {
+	root := siteDir(t)
+	os.WriteFile(filepath.Join(root, "feed.xml"), []byte("<rss><channel><title>Local Feed</title></channel></rss>"), 0o644)
+	os.WriteFile(filepath.Join(root, "pic.png"), make([]byte, 50), 0o644)
+	os.WriteFile(filepath.Join(root, "index.md"), []byte("# Home\n\n[feed](feed.xml) [pic](pic.png) [out](../outside.md)\n"), 0o644)
+	m, hist := openSite(t, root)
+	m = press(t, m, "1", "enter")
+	if out := m.View().Content; !strings.Contains(out, "<rss>") || !strings.Contains(out, "Local Feed") || !strings.Contains(out, "[source]") {
+		t.Errorf("xml:\n%s", out)
+	}
+	m = press(t, m, "b", "2", "enter")
+	if out := m.View().Content; !strings.Contains(out, "An image") || strings.Contains(strings.SplitN(out, "\n", 2)[0], "file://") {
+		t.Errorf("image:\n%s", out)
+	}
+	if _, err := os.Stat(hist); err == nil {
+		t.Error("local pages were recorded in history")
+	}
+}

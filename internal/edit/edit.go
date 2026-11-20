@@ -46,7 +46,7 @@ func Command(getenv func(string) string, file string) (*exec.Cmd, error) {
  * edited and kept by the person; the page on the server is not touched. The
  * name is the last element of the address's path as written (case kept), with
  * anything but letters, digits, dot, dash and underscore replaced by "_", and
- * ".md" added when it has no Markdown or text extension; a name already taken
+ * ".md" added when it has no Markdown, text or data extension (.xml, .json and the like keep theirs); a name already taken
  * gets -1, -2, ... before the extension. An existing file is never replaced.
  *
  * Parameters:
@@ -116,7 +116,8 @@ func copyName(address string) string {
 	}
 	name := strings.TrimLeft(sb.String(), ".") // no hidden files, no ".."
 	switch strings.ToLower(path.Ext(name)) {
-	case ".md", ".markdown", ".txt":
+	case ".md", ".markdown", ".txt", ".xml", ".opml", ".rss", ".atom", ".rdf", ".json", ".yaml", ".yml", ".csv", ".toml", ".ini":
+		// a source keeps its own name: feed.xml is edited as feed.xml
 	default:
 		name = strings.TrimSuffix(name, path.Ext(name)) + ".md"
 	}

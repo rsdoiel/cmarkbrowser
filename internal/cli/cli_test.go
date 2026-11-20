@@ -374,7 +374,7 @@ func TestAnExplicitHistoryFileIsTheStartPage(t *testing.T) {
 
 func TestHelpDocumentsOpenAndHistory(t *testing.T) {
 	_, out, _ := run("-h")
-	for _, want := range []string{"-history FILE", "-no-history", "o asks for an address", "H opens", "site root", "no web server and no protocol", "e edits the page", "$VISUAL"} {
+	for _, want := range []string{"-history FILE", "-no-history", "o asks for an address", "H opens", "site root", "no web server and no protocol", "e edits the page", "$VISUAL", "shown as source"} {
 		if !strings.Contains(out, want) {
 			t.Errorf("help lacks %q", want)
 		}
@@ -421,5 +421,20 @@ func TestAnUnreadableSiteExitsWithNoPermission(t *testing.T) {
 	defer os.Chmod(dir, 0o755)
 	if code, _, errs := run("-dump", dir); code != ExitNoPermission {
 		t.Errorf("exit %d (%s), want 77", code, errs)
+	}
+}
+
+func TestDumpShowsANonMarkdownFileAsSourceOrANote(t *testing.T) {
+	dir := t.TempDir()
+	os.WriteFile(filepath.Join(dir, "index.md"), []byte("# Home\n"), 0o644)
+	os.WriteFile(filepath.Join(dir, "feed.xml"), []byte("<rss><title>Feed T</title></rss>"), 0o644)
+	os.WriteFile(filepath.Join(dir, "pic.png"), make([]byte, 20), 0o644)
+	code, out, errs := run("-dump", "-style", "notty", filepath.Join(dir, "feed.xml"))
+	if code != ExitOK || !strings.Contains(out, "<rss>") || !strings.Contains(out, "Source, shown as text") {
+		t.Errorf("xml: exit %d\n%s\n%s", code, out, errs)
+	}
+	code, out, errs = run("-dump", "-style", "notty", filepath.Join(dir, "pic.png"))
+	if code != ExitOK || !strings.Contains(out, "An image") || !strings.Contains(out, "20 bytes") {
+		t.Errorf("image: exit %d\n%s\n%s", code, out, errs)
 	}
 }

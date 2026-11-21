@@ -45,7 +45,7 @@ func (g Glamour) Render(markdown string, width int) (string, error) {
 	if style == "" {
 		style = "dark"
 	}
-	r, err := glamour.NewTermRenderer(glamour.WithStandardStyle(style), glamour.WithWordWrap(width))
+	r, err := glamour.NewTermRenderer(glamour.WithStandardStyle(style), glamour.WithWordWrap(width), glamour.WithInlineTableLinks(true))
 	if err != nil {
 		return "", err
 	}

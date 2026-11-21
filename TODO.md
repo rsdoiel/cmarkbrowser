@@ -7,7 +7,7 @@ workspace.
 
 ## Bug
 
-- [ ] The numbered links are really ugly if a table contains links (antenna website homepage is a good example). It also make footnotes/endnotes problematic visually
+- [x] The numbered links are really ugly if a table contains links (antenna website homepage is a good example). It also make footnotes/endnotes problematic visually Fixed 2026-11-21: glamour listed table links again under the table and showed `[1][1]`; the renderer now sets `WithInlineTableLinks(true)` (`internal/render/glamour_test.go`). The URL is still printed after link text, in cells too: see the hide-the-URL item.
 
 ## Scaffold (2026-11-19)
 

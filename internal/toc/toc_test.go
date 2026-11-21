@@ -287,3 +287,42 @@ func TestWithNothingToCompareCalendarsAreNewestFirst(t *testing.T) {
 		t.Errorf("prev %q next %q", prev, next)
 	}
 }
+
+// antenna writes every collection's items page under one Collections group, in
+// antenna.yaml order. The group is a list of its own: `]` and `[` step between
+// the collections, stop at its ends, and do not run on into Pages or Posts.
+// The .html form of an items address (what a link may name) finds the same entry.
+const antennaCollectionsTOC = `<?xml version="1.0" encoding="UTF-8"?>
+<opml version="2.0">
+	<head><title>x.example/antenna</title></head>
+	<body>
+		<outline text="Pages">
+			<outline text="Home" url="http://x.example/antenna/index.md"></outline>
+			<outline text="Search" url="http://x.example/antenna/search.md"></outline>
+		</outline>
+		<outline text="Collections">
+			<outline text="Columns" url="http://x.example/antenna/columns_items.md"></outline>
+			<outline text="Craft" url="http://x.example/antenna/craft_items.md"></outline>
+			<outline text="Pacific" url="http://x.example/antenna/pacific_items.md"></outline>
+			<outline text="ebooks.md" url="http://x.example/antenna/ebooks_items.md"></outline>
+		</outline>
+	</body>
+</opml>`
+
+func TestCollectionsStepBetweenThemselvesAndStopAtTheEnds(t *testing.T) {
+	d := mustParse(t, antennaCollectionsTOC, "http://x.example/antenna/.well-known/toc.opml")
+	const base = "http://x.example/antenna/"
+	for page, want := range map[string][2]string{
+		base + "columns_items.md":   {"", base + "craft_items.md"}, // not Pages: Search is not before it
+		base + "craft_items.md":     {base + "columns_items.md", base + "pacific_items.md"},
+		base + "pacific_items.md":   {base + "craft_items.md", base + "ebooks_items.md"},
+		base + "pacific_items.html": {base + "craft_items.md", base + "ebooks_items.md"},
+		base + "ebooks_items.md":    {base + "pacific_items.md", ""},
+		base + "search.md":          {base + "index.md", ""}, // Pages does not continue into Collections
+	} {
+		prev, next, ok := nb(t, d, page)
+		if !ok || prev != want[0] || next != want[1] {
+			t.Errorf("%s: prev %q next %q ok %v, want %q and %q", page, prev, next, ok, want[0], want[1])
+		}
+	}
+}

@@ -373,3 +373,49 @@ func TestRelativeLinksResolveAgainstTheContentLocation(t *testing.T) {
 		t.Errorf("links %#v: want them resolved against /other/, where the Markdown is", v.Links)
 	}
 }
+
+func picturesSite(t *testing.T) *httptest.Server {
+	t.Helper()
+	mux := http.NewServeMux()
+	page := func(path, front string) {
+		mux.HandleFunc(path, func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set("Content-Type", "text/markdown; charset=utf-8")
+			w.Write([]byte("---\ntitle: P\n" + front + "---\nBody ![A cat](cat.png) here.\n\n![](decor.png)\n"))
+		})
+	}
+	page("/docs/alt.md", "rightMarginImage: /m.png\nrightMarginImageAlt: A hill at dusk\n")
+	page("/docs/noalt.md", "rightMarginImage: /m.png\n")
+	return httptest.NewServer(mux)
+}
+
+// A body picture is a link to follow, shown as its alt text; the margin picture
+// is shown the same way at the top when the page gives alt text for it, and not
+// at all when it does not (decorative). No address is printed in the body.
+func TestPicturesAreAltTextLinksAndTheMarginImageNeedsAltText(t *testing.T) {
+	srv := picturesSite(t)
+	defer srv.Close()
+	open := func(path string) *View {
+		v, err := Open(context.Background(), srv.URL+path, render.Glamour{Style: "notty"}, 70)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return v
+	}
+
+	v := open("/docs/alt.md")
+	if len(v.Links) != 2 || v.Links[0].URL != srv.URL+"/m.png" || v.Links[1].URL != srv.URL+"/docs/cat.png" {
+		t.Fatalf("links %#v", v.Links)
+	}
+	if !strings.Contains(v.Text, "[image: A hill at dusk]") || !strings.Contains(v.Text, "Body [image: A cat]") ||
+		strings.Contains(v.Text, ".png") || strings.Contains(v.Text, "decor") {
+		t.Errorf("text:\n%s", v.Text)
+	}
+	if strings.Index(v.Text, "A hill at dusk") > strings.Index(v.Text, "Body") {
+		t.Errorf("the margin picture is not at the top:\n%s", v.Text)
+	}
+
+	v = open("/docs/noalt.md")
+	if len(v.Links) != 1 || v.Links[0].URL != srv.URL+"/docs/cat.png" || strings.Contains(v.Text, "m.png") {
+		t.Errorf("a margin picture with no alt text should show nothing: %#v\n%s", v.Links, v.Text)
+	}
+}

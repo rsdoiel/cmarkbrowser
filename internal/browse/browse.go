@@ -189,6 +189,11 @@ func build(ctx context.Context, addr string, p *page.Page, site *local.Site, r r
 	if !p.Reader { // {{page.NAME}} macros are Markdown-web front matter, not HTML text
 		body, missing = render.Expand(p.Body, p.Meta)
 	}
+	if !p.Reader {
+		// A terminal cannot float a picture into the margin: show its alt text,
+		// when the page gives some, as a line at the top.
+		body = render.MarginImage(metaString(p.Meta, "rightMarginImageAlt"), metaString(p.Meta, "rightMarginImage")) + body
+	}
 	t2 := time.Now()
 	clean, links := render.Prepare(body)
 	t3 := time.Now()
@@ -316,4 +321,12 @@ func (v *View) Display(focus int) string {
 		}
 		return sub[1] + "[" + sub[2] + "]"
 	})
+}
+
+// metaString returns the front matter value for key as a string, or "".
+func metaString(meta map[string]any, key string) string {
+	if v, ok := meta[key]; ok && v != nil {
+		return fmt.Sprint(v)
+	}
+	return ""
 }

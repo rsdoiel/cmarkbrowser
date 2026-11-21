@@ -97,14 +97,44 @@ func Prepare(src string) (string, []Link) {
 			edits = append(edits, edit{start, stop, ""})
 		case *ast.Link:
 			links = append(links, Link{N: len(links) + 1, Dest: string(v.Destination), Text: plainText(v, b)})
-			if pos, ok := lastTextStop(v); ok {
-				edits = append(edits, edit{pos, pos, fmt.Sprintf(" %s\\[%d\\]", Sentinel, len(links))})
+			pos, ok := lastTextStop(v)
+			from, marked := pos, false
+			// A picture inside the link shows its alt text; the marker goes after
+			// the last one when the link's text ends inside it.
+			for _, img := range imagesIn(v) {
+				s, e, alt, iok := imageSpan(b, img)
+				if !iok {
+					continue
+				}
+				skip[img] = true
+				repl := ""
+				if alt != "" {
+					repl = `\[image: ` + escapeAlt(alt) + `\]`
+				}
+				if ok && !marked && lastStopOf(img) == pos {
+					repl += fmt.Sprintf(" %s\\[%d\\]", Sentinel, len(links))
+					marked, from = true, e
+				}
+				edits = append(edits, edit{s, e, repl})
+			}
+			if ok {
+				if !marked {
+					edits = append(edits, edit{pos, pos, fmt.Sprintf(" %s\\[%d\\]", Sentinel, len(links))})
+				}
 				// Glamour prints a link's URL after its text. The Links list and
 				// the status line give the address, so hand glamour a bare "#",
 				// which it prints nothing for. Link.Dest keeps the real one.
-				if from, to, ok := destSpan(b, pos, string(v.Destination)); ok {
-					edits = append(edits, edit{from, to, "(#)"})
+				if s, e, ok := destSpan(b, from, string(v.Destination)); ok {
+					edits = append(edits, edit{s, e, "(#)"})
 				}
+			}
+		case *ast.Image:
+			// A picture with alt text is a link whose text is the alt text, so the
+			// address can be followed. One with none is decorative: left to the
+			// glamour style, which prints nothing for it.
+			if s, e, alt, ok := imageSpan(b, v); ok && alt != "" {
+				links = append(links, Link{N: len(links) + 1, Dest: string(v.Destination), Text: "image: " + alt})
+				edits = append(edits, edit{s, e, fmt.Sprintf(`[\[image: %s\] %s\[%d\]](#)`, escapeAlt(alt), Sentinel, len(links))})
 			}
 		}
 		return ast.WalkContinue, nil
@@ -226,11 +256,23 @@ func plainText(n ast.Node, src []byte) string {
  *   from, to, ok := destSpan([]byte("[a](b.md) c"), 2, "b.md") // 3, 9, true
  */
 func destSpan(b []byte, from int, dest string) (int, int, bool) {
-	i := bytes.Index(b[from:], []byte("]("))
-	if i < 0 {
-		return 0, 0, false
+	for at := from; at < len(b); {
+		i := bytes.Index(b[at:], []byte("]("))
+		if i < 0 {
+			return 0, 0, false
+		}
+		open := at + i + 1
+		if raw, end, ok := parseDest(b, open); ok && string(util.UnescapePunctuations(raw)) == dest {
+			return open, end, true
+		}
+		at = open
 	}
-	open := from + i + 1
+	return 0, 0, false
+}
+
+// parseDest reads "(destination "title")" with the "(" at b[open]. It returns
+// the destination as written and the offset just after the ")".
+func parseDest(b []byte, open int) ([]byte, int, bool) {
 	j := open + 1
 	for j < len(b) && (b[j] == ' ' || b[j] == '\t' || b[j] == '\n') {
 		j++
@@ -245,7 +287,7 @@ func destSpan(b []byte, from int, dest string) (int, int, bool) {
 			k++
 		}
 		if k >= len(b) || b[k] != '>' {
-			return 0, 0, false
+			return nil, 0, false
 		}
 		raw = b[j+1 : k]
 		j = k + 1
@@ -285,7 +327,7 @@ func destSpan(b []byte, from int, dest string) (int, int, bool) {
 			j++
 		}
 		if j >= len(b) {
-			return 0, 0, false
+			return nil, 0, false
 		}
 		j++
 		for j < len(b) && (b[j] == ' ' || b[j] == '\t' || b[j] == '\n') {
@@ -293,10 +335,99 @@ func destSpan(b []byte, from int, dest string) (int, int, bool) {
 		}
 	}
 	if j >= len(b) || b[j] != ')' {
-		return 0, 0, false
+		return nil, 0, false
 	}
-	if string(util.UnescapePunctuations(raw)) != dest {
-		return 0, 0, false
+	return raw, j + 1, true
+}
+
+// imagesIn returns the images under n, in reading order.
+func imagesIn(n ast.Node) []*ast.Image {
+	var out []*ast.Image
+	_ = ast.Walk(n, func(c ast.Node, entering bool) (ast.WalkStatus, error) {
+		if i, ok := c.(*ast.Image); ok && entering {
+			out = append(out, i)
+		}
+		return ast.WalkContinue, nil
+	})
+	return out
+}
+
+// lastStopOf is lastTextStop without the found flag, 0 when n has no text.
+func lastStopOf(n ast.Node) int {
+	pos, _ := lastTextStop(n)
+	return pos
+}
+
+/** imageSpan finds a picture's whole "![alt](destination)" in the source. It
+ * needs some alt text to anchor on, and reports the span only when the
+ * destination it reads equals the one the parser found (see destSpan), so a
+ * picture with no alt text, or anything unusual, is left alone.
+ *
+ * Parameters:
+ *   b ([]byte) — the Markdown source
+ *   img (*ast.Image) — the picture node
+ *
+ * Returns:
+ *   int, int — the offsets of the "!" and just after the ")"
+ *   string — the alt text, markup removed and white space collapsed
+ *   bool — true when the span was found
+ *
+ * Example:
+ *   from, to, alt, ok := imageSpan([]byte("a ![cat](c.png) b"), img) // 2, 15, "cat", true
+ */
+func imageSpan(b []byte, img *ast.Image) (int, int, string, bool) {
+	first, found := -1, false
+	_ = ast.Walk(img, func(c ast.Node, entering bool) (ast.WalkStatus, error) {
+		if t, ok := c.(*ast.Text); ok && entering && !found {
+			first, found = t.Segment.Start, true
+		}
+		return ast.WalkContinue, nil
+	})
+	if !found {
+		return 0, 0, "", false
 	}
-	return open, j + 1, true
+	start := bytes.LastIndex(b[:first], []byte("!["))
+	if start < 0 {
+		return 0, 0, "", false
+	}
+	stop, _ := lastTextStop(img)
+	_, to, ok := destSpan(b, stop, string(img.Destination))
+	if !ok {
+		return 0, 0, "", false
+	}
+	alt := strings.Join(strings.Fields(string(util.UnescapePunctuations([]byte(plainText(img, b))))), " ")
+	return start, to, alt, true
+}
+
+// altEscaper makes alt text safe to put back into Markdown as plain text.
+var altEscaper = strings.NewReplacer(
+	`\`, `\\`, "[", `\[`, "]", `\]`, "*", `\*`, "_", `\_`, "`", "\\`",
+	"<", `\<`, ">", `\>`, "&", `\&`, "!", `\!`, "|", `\|`, "#", `\#`,
+)
+
+func escapeAlt(s string) string { return altEscaper.Replace(s) }
+
+/** MarginImage returns Markdown for the picture a page names in its front matter
+ * (rightMarginImage), so it is shown like any other picture: as its alt text
+ * (rightMarginImageAlt), a link to follow. A terminal cannot float it into the
+ * margin. With no alt text the picture is decorative and nothing is shown.
+ *
+ * Parameters:
+ *   alt (string) — the alt text from the front matter
+ *   dest (string) — the picture's address from the front matter
+ *
+ * Returns:
+ *   string — "![alt](<dest>)" and a blank line, or "" when there is nothing to
+ *     show or the values cannot be quoted safely
+ *
+ * Example:
+ *   md := render.MarginImage("A hill", "/hill.png") // "![A hill](</hill.png>)\n\n"
+ */
+func MarginImage(alt, dest string) string {
+	alt = strings.Join(strings.Fields(alt), " ")
+	dest = strings.TrimSpace(dest)
+	if alt == "" || dest == "" || strings.ContainsAny(dest, "<>\n\r") {
+		return ""
+	}
+	return "![" + escapeAlt(alt) + "](<" + dest + ">)\n\n"
 }

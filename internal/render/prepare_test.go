@@ -51,8 +51,9 @@ func TestPrepareNumbersLinksInOrder(t *testing.T) {
 	}
 }
 
-func TestPrepareLeavesImagesAlone(t *testing.T) {
-	_, links := Prepare("![pic](p.png)\n")
+// An image with no alt text is decorative: no link, nothing to follow.
+func TestPrepareLeavesImagesWithoutAltTextAlone(t *testing.T) {
+	_, links := Prepare("![](p.png)\n")
 	if len(links) != 0 {
 		t.Errorf("image counted as link: %#v", links)
 	}
@@ -155,6 +156,7 @@ func TestDestSpan(t *testing.T) {
 		{"[a](https://x.org/a_(b))", "https://x.org/a_(b)", "(https://x.org/a_(b))", true},
 		{`[a](b\)c.md)`, "b)c.md", `(b\)c.md)`, true},
 		{"[a]()", "", "()", true},
+		{"[a ![](i.png)](d.md)", "d.md", "(d.md)", true}, // the picture's "](" is not the link's
 		{"[a][ref]\n\n[ref]: b.md", "b.md", "", false},
 		{"[a](b.md", "b.md", "", false},
 		{"[a](other.md)", "b.md", "", false},
@@ -187,5 +189,62 @@ func TestPrepareHidesInlineDestinationsFromGlamour(t *testing.T) {
 	}
 	if strings.Count(got, "(#)") != 2 || !strings.Contains(got, "[r]: c.md") {
 		t.Errorf("%q", got)
+	}
+}
+
+// An image with alt text is a numbered link whose text is "[image: alt]", so
+// the address can be followed (it opens as a note). Its destination is hidden
+// from glamour like any link's, and Link.Dest keeps it.
+func TestPrepareMakesAnImageWithAltTextAFollowableLink(t *testing.T) {
+	src := "Text ![A *cat*, 2 [3]](cat.png \"t\") inline, then [a link](a.md).\n"
+	got, links := Prepare(src)
+	if len(links) != 2 || links[0].N != 1 || links[0].Dest != "cat.png" || links[0].Text != "image: A cat, 2 [3]" ||
+		links[1].N != 2 || links[1].Dest != "a.md" {
+		t.Fatalf("links %#v", links)
+	}
+	want := "Text [\\[image: A cat, 2 \\[3\\]\\] " + Sentinel + "\\[1\\]](#) inline, then [a link " + Sentinel + "\\[2\\]](#).\n"
+	if got != want {
+		t.Errorf("got  %q\nwant %q", got, want)
+	}
+}
+
+// A picture inside a link (a badge) is not a link of its own: the link keeps
+// its target and shows the alt text, marked once.
+func TestPrepareAnImageInsideALinkShowsItsAltTextOnce(t *testing.T) {
+	src := "[![badge](b.svg)](https://x.org/) and [![one](1.png) two ![](3.png)](d.md)\n"
+	got, links := Prepare(src)
+	if len(links) != 2 || links[0].Dest != "https://x.org/" || links[1].Dest != "d.md" {
+		t.Fatalf("links %#v", links)
+	}
+	for _, bad := range []string{"b.svg", "1.png", "x.org", "d.md"} {
+		if strings.Contains(got, bad) {
+			t.Errorf("%q still in %q", bad, got)
+		}
+	}
+	if !strings.HasPrefix(got, "[\\[image: badge\\] "+Sentinel+"\\[1\\]](#) and [\\[image: one\\]") ||
+		strings.Count(got, "\\[1\\]") != 1 || strings.Count(got, "\\[2\\]") != 1 {
+		t.Errorf("%q", got)
+	}
+}
+
+func TestPrepareAnImageInATableCellIsAFollowableLink(t *testing.T) {
+	got, links := Prepare("| a |\n| --- |\n| ![in table](t.png) |\n")
+	if len(links) != 1 || links[0].Dest != "t.png" || strings.Contains(got, "t.png") {
+		t.Errorf("%#v %q", links, got)
+	}
+}
+
+func TestMarginImage(t *testing.T) {
+	for _, c := range []struct{ alt, dest, want string }{
+		{"A margin picture", "/m.png", "![A margin picture](</m.png>)\n\n"},
+		{"  odd *alt* [x]\n y ", "m.png", "![odd \\*alt\\* \\[x\\] y](<m.png>)\n\n"},
+		{"", "/m.png", ""},  // no alt text: decorative
+		{"alt", "", ""},     // nothing to show
+		{"alt", "a>b", ""},  // cannot be quoted safely
+		{"alt", "a\nb", ""}, // likewise
+	} {
+		if got := MarginImage(c.alt, c.dest); got != c.want {
+			t.Errorf("MarginImage(%q, %q) = %q, want %q", c.alt, c.dest, got, c.want)
+		}
 	}
 }

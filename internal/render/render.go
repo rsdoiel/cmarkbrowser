@@ -57,6 +57,10 @@ func (g Glamour) Render(markdown string, width int) (string, error) {
 	// Links list give the address, so print nothing for it; the text stays a
 	// terminal hyperlink.
 	quiet.Link.Format = `{{ "" }}`
+	// A picture left over (no alt text, or one Prepare could not place) shows
+	// nothing: no "Image:" label and no address.
+	quiet.ImageText.Format = ""
+	quiet.Image.Format = `{{ "" }}`
 	r, err := glamour.NewTermRenderer(glamour.WithStyles(quiet), glamour.WithWordWrap(width), glamour.WithInlineTableLinks(true))
 	if err != nil {
 		return "", err

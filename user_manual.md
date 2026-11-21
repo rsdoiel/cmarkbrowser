@@ -15,7 +15,7 @@ Arrow keys, PgUp, PgDn, space, `g` and `G` scroll. `q` quits.
 
 Links are numbered, like `[3]`. Press Tab to move to the next link, Shift-Tab to
 the previous one, and Enter to follow the focused link. Or type a link's number
-and press Enter. `b` goes back and `f` goes forward. Esc undoes one thing: a typed
+and press Enter. `b` goes back and `f` goes forward, each to the place on the page where you left it. Esc undoes one thing: a typed
 number, then the focus, then a search.
 
 A page is Markdown with optional front matter. HTML inside a page is removed, as

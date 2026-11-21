@@ -51,6 +51,7 @@ type Model struct {
 	start  string
 	view   *browse.View
 	hist   []string
+	offs   []int // the scroll position each history entry was left at, in step with hist
 	idx    int
 	vp     viewport.Model
 	w, h   int
@@ -240,12 +241,17 @@ func (m Model) loaded(msg loadMsg) Model {
 	if len(msg.v.Missing) > 0 {
 		m.status = "no front matter value for {{page." + strings.Join(msg.v.Missing, "}}, {{page.") + "}}"
 	}
+	// remember where the page being left was scrolled to, for going back to it
+	if m.view != nil && m.idx >= 0 && m.idx < len(m.offs) {
+		m.offs[m.idx] = m.vp.YOffset()
+	}
 	m.view = msg.v
 	addr := msg.v.Page.URL
 	if msg.idx < 0 {
 		if m.idx+1 < len(m.hist) {
 			m.hist = m.hist[:m.idx+1]
 		}
+		m.offs = append(m.offs[:len(m.hist):len(m.hist)], 0)
 		m.hist = append(m.hist, addr)
 		m.idx = len(m.hist) - 1
 	} else {
@@ -256,6 +262,9 @@ func (m Model) loaded(msg loadMsg) Model {
 	m.prompt, m.query, m.matches, m.marked, m.pattern, m.cur = false, "", nil, nil, "", 0
 	m.vp.SetContent(msg.v.Display(0))
 	m.vp.GotoTop()
+	if msg.idx >= 0 && msg.idx < len(m.offs) {
+		m.vp.SetYOffset(m.offs[msg.idx]) // back or forward: where it was left, clamped to the new length
+	}
 	if m.restoreAddr != "" && m.restoreAddr == msg.v.Page.URL {
 		m.vp.SetYOffset(m.restoreOffset) // back where the edit began, clamped to the new length
 	}

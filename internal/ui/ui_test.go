@@ -1321,3 +1321,47 @@ func TestHWithNoHistoryFileSaysHowToTurnItOn(t *testing.T) {
 		t.Errorf("status %q", m.status)
 	}
 }
+
+// Going back returns to where the page was left, not to its top.
+func TestBackReturnsToTheScrollPositionYouLeft(t *testing.T) {
+	m := openLong(t)
+	m = press(t, m, "tab", "tab") // focus "far", which scrolls it into view
+	left := m.vp.YOffset()
+	if left == 0 {
+		t.Fatal("the page did not scroll; the test proves nothing")
+	}
+	m = press(t, m, "enter") // follow it
+	if !strings.Contains(m.View().Content, "Visited /b.md") || m.vp.YOffset() != 0 {
+		t.Fatalf("a new page starts at the top: offset %d\n%s", m.vp.YOffset(), m.View().Content)
+	}
+	m = press(t, m, "b")
+	if got := m.vp.YOffset(); got != left {
+		t.Errorf("back: offset %d, want %d", got, left)
+	}
+}
+
+// Each history entry keeps its own position: a, scrolled; b; back to a; and the
+// entries stay in step when a new visit cuts off the forward ones.
+func TestEachHistoryEntryKeepsItsOwnScrollPosition(t *testing.T) {
+	m := openLong(t)
+	m = press(t, m, "tab", "tab")
+	left := m.vp.YOffset()
+	m = press(t, m, "enter", "b", "f") // a (scrolled) -> b -> a -> b
+	if m.vp.YOffset() != 0 || !strings.Contains(m.View().Content, "Visited /b.md") {
+		t.Errorf("forward to a page left at its top: offset %d", m.vp.YOffset())
+	}
+	m = press(t, m, "b")
+	if got := m.vp.YOffset(); got != left {
+		t.Errorf("back again: offset %d, want %d", got, left)
+	}
+	// a new visit from a cuts off b; the new entry starts at the top and back
+	// still finds a's position
+	m = press(t, m, "tab", "tab", "tab", "enter")
+	if !strings.Contains(m.View().Content, "Visited /c.md") || m.vp.YOffset() != 0 {
+		t.Fatalf("after following the last link:\n%s", m.View().Content)
+	}
+	m = press(t, m, "b")
+	if m.vp.YOffset() == 0 {
+		t.Error("back after a new visit lost the position")
+	}
+}

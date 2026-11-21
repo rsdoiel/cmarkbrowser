@@ -142,3 +142,50 @@ func TestPrepareBigPageWithManyLinksIsFast(t *testing.T) {
 		t.Errorf("links %d, last marker missing", len(links))
 	}
 }
+
+func TestDestSpan(t *testing.T) {
+	cases := []struct {
+		src, dest, want string
+		ok              bool
+	}{
+		{"[a](b.md) c", "b.md", "(b.md)", true},
+		{"[a](<b c.md>)", "b c.md", "(<b c.md>)", true},
+		{`[a](b.md "a title")`, "b.md", `(b.md "a title")`, true},
+		{`[a](b.md 'it\'s')`, "b.md", `(b.md 'it\'s')`, true},
+		{"[a](https://x.org/a_(b))", "https://x.org/a_(b)", "(https://x.org/a_(b))", true},
+		{`[a](b\)c.md)`, "b)c.md", `(b\)c.md)`, true},
+		{"[a]()", "", "()", true},
+		{"[a][ref]\n\n[ref]: b.md", "b.md", "", false},
+		{"[a](b.md", "b.md", "", false},
+		{"[a](other.md)", "b.md", "", false},
+	}
+	for _, c := range cases {
+		from, to, ok := destSpan([]byte(c.src), 2, c.dest)
+		if ok != c.ok || (ok && c.src[from:to] != c.want) {
+			t.Errorf("%q: got %v %q, want %v %q", c.src, ok, c.src[from:to*b2i(ok)], c.ok, c.want)
+		}
+	}
+}
+
+func b2i(b bool) int {
+	if b {
+		return 1
+	}
+	return 0
+}
+
+// The destination is replaced by "#" for glamour, but the collected links keep
+// the real one, and the text around the link is untouched.
+func TestPrepareHidesInlineDestinationsFromGlamour(t *testing.T) {
+	src := "A [one](a.md \"t\"), [two **b**](<b c.md>) and [three][r].\n\n[r]: c.md\n"
+	got, links := Prepare(src)
+	if len(links) != 3 || links[0].Dest != "a.md" || links[1].Dest != "b c.md" || links[2].Dest != "c.md" {
+		t.Fatalf("links %#v", links)
+	}
+	if strings.Contains(got, "a.md") || strings.Contains(got, "b c.md") {
+		t.Errorf("an inline destination is still in %q", got)
+	}
+	if strings.Count(got, "(#)") != 2 || !strings.Contains(got, "[r]: c.md") {
+		t.Errorf("%q", got)
+	}
+}

@@ -1,6 +1,7 @@
 package render
 
 import (
+	"bytes"
 	"fmt"
 	"sort"
 	"strings"
@@ -8,6 +9,7 @@ import (
 	"github.com/yuin/goldmark"
 	"github.com/yuin/goldmark/ast"
 	"github.com/yuin/goldmark/text"
+	"github.com/yuin/goldmark/util"
 )
 
 /** Sentinel is a zero-width character placed before each link's [N] marker, so
@@ -97,6 +99,12 @@ func Prepare(src string) (string, []Link) {
 			links = append(links, Link{N: len(links) + 1, Dest: string(v.Destination), Text: plainText(v, b)})
 			if pos, ok := lastTextStop(v); ok {
 				edits = append(edits, edit{pos, pos, fmt.Sprintf(" %s\\[%d\\]", Sentinel, len(links))})
+				// Glamour prints a link's URL after its text. The Links list and
+				// the status line give the address, so hand glamour a bare "#",
+				// which it prints nothing for. Link.Dest keeps the real one.
+				if from, to, ok := destSpan(b, pos, string(v.Destination)); ok {
+					edits = append(edits, edit{from, to, "(#)"})
+				}
 			}
 		}
 		return ast.WalkContinue, nil
@@ -198,4 +206,97 @@ func plainText(n ast.Node, src []byte) string {
 		return ast.WalkContinue, nil
 	})
 	return sb.String()
+}
+
+/** destSpan finds the "(destination "title")" part of an inline link whose text
+ * ended at from. It reports the span only when the destination it reads equals
+ * dest (what the parser found), so a reference-style link or anything unusual
+ * is left alone.
+ *
+ * Parameters:
+ *   b ([]byte) — the Markdown source
+ *   from (int) — the end of the link's last text
+ *   dest (string) — the destination the parser reported
+ *
+ * Returns:
+ *   int, int — the offsets of the "(" and just after the ")"
+ *   bool — true when the span was found and matches dest
+ *
+ * Example:
+ *   from, to, ok := destSpan([]byte("[a](b.md) c"), 2, "b.md") // 3, 9, true
+ */
+func destSpan(b []byte, from int, dest string) (int, int, bool) {
+	i := bytes.Index(b[from:], []byte("]("))
+	if i < 0 {
+		return 0, 0, false
+	}
+	open := from + i + 1
+	j := open + 1
+	for j < len(b) && (b[j] == ' ' || b[j] == '\t' || b[j] == '\n') {
+		j++
+	}
+	var raw []byte
+	if j < len(b) && b[j] == '<' {
+		k := j + 1
+		for k < len(b) && b[k] != '>' && b[k] != '\n' {
+			if b[k] == '\\' && k+1 < len(b) {
+				k++
+			}
+			k++
+		}
+		if k >= len(b) || b[k] != '>' {
+			return 0, 0, false
+		}
+		raw = b[j+1 : k]
+		j = k + 1
+	} else {
+		k, depth := j, 0
+		for k < len(b) && b[k] != ' ' && b[k] != '\t' && b[k] != '\n' {
+			if b[k] == '\\' && k+1 < len(b) {
+				k += 2
+				continue
+			}
+			if b[k] == '(' {
+				depth++
+			} else if b[k] == ')' {
+				if depth == 0 {
+					break
+				}
+				depth--
+			}
+			k++
+		}
+		raw = b[j:k]
+		j = k
+	}
+	for j < len(b) && (b[j] == ' ' || b[j] == '\t' || b[j] == '\n') {
+		j++
+	}
+	if j < len(b) && (b[j] == '"' || b[j] == '\'' || b[j] == '(') {
+		closer := b[j]
+		if closer == '(' {
+			closer = ')'
+		}
+		j++
+		for j < len(b) && b[j] != closer {
+			if b[j] == '\\' && j+1 < len(b) {
+				j++
+			}
+			j++
+		}
+		if j >= len(b) {
+			return 0, 0, false
+		}
+		j++
+		for j < len(b) && (b[j] == ' ' || b[j] == '\t' || b[j] == '\n') {
+			j++
+		}
+	}
+	if j >= len(b) || b[j] != ')' {
+		return 0, 0, false
+	}
+	if string(util.UnescapePunctuations(raw)) != dest {
+		return 0, 0, false
+	}
+	return open, j + 1, true
 }

@@ -28,3 +28,29 @@ func TestGlamourTableLinksAreNotRepeatedAfterTheTable(t *testing.T) {
 		t.Errorf("link 1 is not marked exactly once:\n%s", plain)
 	}
 }
+
+// Glamour prints each link's URL after its text. The page already shows the
+// address in the status line and the Links list, so the body must not repeat
+// it, in a paragraph or a table cell, and the spacing around the marker stays
+// single, with punctuation right after it.
+func TestGlamourDoesNotPrintLinkURLsInTheBody(t *testing.T) {
+	src := "See [first](https://example.org/one.md) now, or [again](https://example.org/again.md).\n\nA [ref][r] link.\n\n[r]: https://example.org/r.md\n\n| A | B |\n| --- | --- |\n| [two](https://example.org/two.md) | x |\n"
+	prepared, _ := Prepare(src)
+	for _, style := range []string{"notty", "dark", "light"} {
+		out, err := Glamour{Style: style}.Render(prepared, 70)
+		if err != nil {
+			t.Fatal(err)
+		}
+		plain := osc8.ReplaceAllString(strings.ReplaceAll(out, Sentinel, ""), "")
+		plain = ansiSGR.ReplaceAllString(plain, "")
+		if strings.Contains(plain, "example.org") {
+			t.Errorf("%s: a URL is printed in the body:\n%s", style, plain)
+		}
+		if !strings.Contains(plain, "See first [1] now, or again [2].") {
+			t.Errorf("%s: want %q in:\n%s", style, "See first [1] now, or again [2].", plain)
+		}
+	}
+}
+
+// ansiSGR matches a colour or style escape.
+var ansiSGR = regexp.MustCompile("\x1b\\[[0-9;]*m")

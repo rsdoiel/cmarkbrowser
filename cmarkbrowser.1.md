@@ -1,4 +1,4 @@
-%cmarkbrowser(1) user manual | version 0.0.3 28e4374
+%cmarkbrowser(1) user manual | version 0.0.3 6b4cef3
 % R. S. Doiel
 % 2026-11-26
 

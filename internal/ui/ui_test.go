@@ -1027,18 +1027,26 @@ func TestNextAndPreviousUseTheTableOfContentsWhenThePageNamesNone(t *testing.T) 
 	}
 }
 
-// In a list with calendar outlines the lines run newest first, so the
-// previous page is the older one, the line below (antennaApp DR-0013 5).
-func TestInPostsPreviousIsOlderAndNextIsNewer(t *testing.T) {
+// The arrows read the outline as BonBon does (markdownweb DR-0004): one flat
+// list, the line above is previous, the line below is next, nothing reordered
+// for calendar outlines. The Posts lines run newest first, so previous of the
+// middle post is the newer one above it, the opposite of what this test said
+// before cmarkbrowser adopted markdownweb v0.0.4 (antennaApp DR-0013 5). The
+// ends wrap: the line after the last post is the first page of the list.
+func TestInPostsPreviousIsTheLineAboveAndNextTheLineBelow(t *testing.T) {
 	srv, _ := tocUISite(t)
 	m := openTOC(t, srv, "/blog/mid.md")
 	m = press(t, m, "[")
-	if !strings.Contains(m.View().Content, "Old post") {
-		t.Errorf("previous of the middle post should be the old one:\n%s", m.View().Content)
+	if !strings.Contains(m.View().Content, "New post") {
+		t.Errorf("previous of the middle post should be the line above, the new one:\n%s", m.View().Content)
 	}
 	m = press(t, m, "]", "]")
-	if !strings.Contains(m.View().Content, "New post") {
-		t.Errorf("two steps newer:\n%s", m.View().Content)
+	if !strings.Contains(m.View().Content, "Old post") {
+		t.Errorf("two steps down from the new post is the old one:\n%s", m.View().Content)
+	}
+	m = press(t, m, "]")
+	if !strings.Contains(m.View().Content, "Page A") {
+		t.Errorf("below the last line is the first, the list wraps:\n%s", m.View().Content)
 	}
 }
 
@@ -1064,12 +1072,19 @@ func TestNothingIsFetchedUntilAKeyNeedsIt(t *testing.T) {
 	}
 }
 
-func TestTheEndsOfAListAndUnlistedPagesSaySoAndStay(t *testing.T) {
+// The ends of the list wrap (markdownweb DR-0004), where they used to stop
+// with "no previous page"; a page the outline does not list still says so and
+// stays. A site with no outline at all is the next test.
+func TestTheEndsOfAListWrapAndUnlistedPagesSaySoAndStay(t *testing.T) {
 	srv, _ := tocUISite(t)
 	m := openTOC(t, srv, "/p/a.md")
 	m = press(t, m, "[")
-	if out := m.View().Content; !strings.Contains(out, "no previous page") || !strings.Contains(out, "Page A") {
-		t.Errorf("first page, [:\n%s", out)
+	if out := m.View().Content; !strings.Contains(out, "Old post") {
+		t.Errorf("first page, [ wraps to the last line:\n%s", out)
+	}
+	m = press(t, m, "]")
+	if out := m.View().Content; !strings.Contains(out, "Page A") {
+		t.Errorf("last page, ] wraps to the first line:\n%s", out)
 	}
 	m = openTOC(t, srv, "/lone.md") // a page the outline does not list
 	m = press(t, m, "]")

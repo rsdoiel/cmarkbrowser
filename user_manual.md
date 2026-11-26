@@ -117,6 +117,17 @@ links to standard output, and `-style notty` leaves out the colors:
 cmarkbrowser -dump -style notty https://rsdoiel.github.io/blog/index.md | less
 ~~~
 
+## Configuration
+
+If `~/.config/cmarkbrowser/cmarkbrowser.yaml` exists (`$XDG_CONFIG_HOME` is used
+when set) cmarkbrowser reads it before it fetches anything. So far it holds one
+setting, the User-Agent sent with every request, `cmarkbrowser/VERSION` unless
+you name another:
+
+~~~yaml
+user-agent: cmarkbrowser/0.0.2 (+https://example.org/about)
+~~~
+
 ## Exit codes
 
 | Code | Meaning |
@@ -127,6 +138,7 @@ cmarkbrowser -dump -style notty https://rsdoiel.github.io/blog/index.md | less
 | 66 | The page, path or index.md is not there. |
 | 69 | The server cannot be reached. |
 | 77 | The operating system refused access to the path. |
+| 78 | The configuration file is there and wrong. |
 
 ## When something looks wrong
 

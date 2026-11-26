@@ -6,6 +6,7 @@ import (
 	"errors"
 	"io/fs"
 
+	"github.com/rsdoiel/cmarkbrowser/internal/config"
 	"github.com/rsdoiel/markdownweb/page"
 )
 
@@ -21,6 +22,7 @@ const (
 	ExitInternal     = 70
 	ExitCantCreate   = 73
 	ExitNoPermission = 77
+	ExitConfig       = 78
 )
 
 // ErrUsage marks a bad command line; wrap it with %w to exit 2.
@@ -37,7 +39,7 @@ var ErrCantCreate = errors.New("cannot create")
  *   err (error) — nil, or an error wrapping one of this package's sentinels
  *
  * Returns:
- *   int — 0 for nil, the class code (2, 65, 66, 69, 73, 77), or ExitInternal for an unclassified error
+ *   int — 0 for nil, the class code (2, 65, 66, 69, 73, 77, 78), or ExitInternal for an unclassified error
  *
  * Example:
  *   cli.ExitCode(fmt.Errorf("%w: no URL", cli.ErrUsage)) // 2
@@ -52,6 +54,8 @@ func ExitCode(err error) int {
 		return ExitNoPermission
 	case errors.Is(err, ErrCantCreate):
 		return ExitCantCreate
+	case errors.Is(err, config.ErrConfig):
+		return ExitConfig
 	case errors.Is(err, page.ErrData):
 		return ExitData
 	case errors.Is(err, page.ErrNoInput):

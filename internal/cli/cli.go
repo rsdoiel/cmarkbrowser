@@ -9,15 +9,19 @@ import (
 	"os"
 	"runtime"
 	"strings"
+	"time"
 
 	tea "charm.land/bubbletea/v2"
 	"golang.org/x/term"
 
 	cmarkbrowser "github.com/rsdoiel/cmarkbrowser"
 	"github.com/rsdoiel/cmarkbrowser/internal/browse"
+	"github.com/rsdoiel/cmarkbrowser/internal/config"
 	"github.com/rsdoiel/cmarkbrowser/internal/render"
 	"github.com/rsdoiel/cmarkbrowser/internal/ui"
 	"github.com/rsdoiel/markdownweb/debuglog"
+	"github.com/rsdoiel/markdownweb/fetch"
+	"github.com/rsdoiel/markdownweb/page"
 )
 
 const appName = "cmarkbrowser"
@@ -105,6 +109,17 @@ func Run(args []string, stdout, stderr io.Writer) int {
 	if !dump && !isTerminal(stdout) {
 		return fail(stderr, fmt.Errorf("%w: the browser needs a terminal; use -dump to print a page", ErrUsage))
 	}
+	// The configuration is read before anything is fetched: a file that is
+	// present and wrong stops the run (exit 78).
+	cfg, err := config.Load()
+	if err != nil {
+		return fail(stderr, err)
+	}
+	userAgent := cfg.UserAgent
+	if userAgent == "" {
+		userAgent = defaultUserAgent()
+	}
+	page.SetFetcher(fetch.New(fetch.Options{UserAgent: userAgent, Timeout: 30 * time.Second, MaxRedirects: 10}))
 	// The log is created before anything is fetched, so a failure to create it
 	// stops the run instead of silently losing the record the person asked for.
 	var log *debuglog.Logger
@@ -120,7 +135,7 @@ func Run(args []string, stdout, stderr io.Writer) int {
 			mode = "dump"
 		}
 		log.Event("start", "schema", 1, "version", cmarkbrowser.Version, "hash", cmarkbrowser.ReleaseHash,
-			"mode", mode, "args", args, "goos", runtime.GOOS, "goarch", runtime.GOARCH, "pid", os.Getpid())
+			"mode", mode, "user_agent", userAgent, "args", args, "goos", runtime.GOOS, "goarch", runtime.GOARCH, "pid", os.Getpid())
 	}
 	// A file: address is not a path, and there is no protocol for a local site
 	// (DR-0001): the argument is a path, or an http:// or https:// address.
@@ -159,6 +174,11 @@ func Run(args []string, stdout, stderr io.Writer) int {
 	}
 	log.Event("exit", "code", code)
 	return code
+}
+
+// defaultUserAgent is the User-Agent when the configuration file names none.
+func defaultUserAgent() string {
+	return appName + "/" + cmarkbrowser.Version
 }
 
 // runDump prints a rendered page, then its numbered links. A local file is

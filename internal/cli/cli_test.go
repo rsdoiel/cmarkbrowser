@@ -11,6 +11,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	cmarkbrowser "github.com/rsdoiel/cmarkbrowser"
 )
 
 func run(args ...string) (int, string, string) {
@@ -455,5 +457,117 @@ func TestDumpSaysWhenFrontMatterIsNotClosed(t *testing.T) {
 	}
 	if !strings.Contains(out.String(), "Heading") || strings.Contains(out.String(), "warning") {
 		t.Errorf("stdout %q", out.String())
+	}
+}
+
+// configHome points the configuration directory at a fresh directory and
+// returns the path of cmarkbrowser.yaml in it.
+func configHome(t *testing.T) string {
+	t.Helper()
+	dir := t.TempDir()
+	t.Setenv("XDG_CONFIG_HOME", dir)
+	t.Setenv("HOME", dir)
+	return filepath.Join(dir, "cmarkbrowser", "cmarkbrowser.yaml")
+}
+
+// userAgentSite serves a Markdown page and records the User-Agent of each request.
+func userAgentSite(t *testing.T) (*httptest.Server, func() []string) {
+	t.Helper()
+	var seen []string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		seen = append(seen, r.UserAgent())
+		w.Header().Set("Content-Type", "text/markdown")
+		w.Write([]byte("# Hi\n"))
+	}))
+	t.Cleanup(srv.Close)
+	return srv, func() []string { return seen }
+}
+
+func TestUserAgentDefaultNamesCmarkbrowser(t *testing.T) {
+	configHome(t)
+	srv, seen := userAgentSite(t)
+	if code, _, errs := run("-dump", "-style", "notty", srv.URL+"/p.md"); code != 0 {
+		t.Fatalf("code %d, stderr %q", code, errs)
+	}
+	uas := seen()
+	if len(uas) == 0 {
+		t.Fatal("no request")
+	}
+	for _, ua := range uas {
+		if !strings.HasPrefix(ua, "cmarkbrowser/"+cmarkbrowser.Version) {
+			t.Errorf("User-Agent %q", ua)
+		}
+	}
+}
+
+func TestUserAgentFromTheConfigurationFile(t *testing.T) {
+	p := configHome(t)
+	if err := os.MkdirAll(filepath.Dir(p), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(p, []byte("user-agent: my-reader/9\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	srv, seen := userAgentSite(t)
+	if code, _, errs := run("-dump", "-style", "notty", srv.URL+"/p.md"); code != 0 {
+		t.Fatalf("code %d, stderr %q", code, errs)
+	}
+	for _, ua := range seen() {
+		if ua != "my-reader/9" {
+			t.Errorf("User-Agent %q", ua)
+		}
+	}
+}
+
+func TestEmptyUserAgentInTheFileIsTheDefault(t *testing.T) {
+	p := configHome(t)
+	os.MkdirAll(filepath.Dir(p), 0o755)
+	os.WriteFile(p, []byte("user-agent: \"\"\n"), 0o644)
+	srv, seen := userAgentSite(t)
+	run("-dump", "-style", "notty", srv.URL+"/p.md")
+	if uas := seen(); len(uas) == 0 || !strings.HasPrefix(uas[0], "cmarkbrowser/") {
+		t.Fatalf("User-Agents %v", uas)
+	}
+}
+
+// A configuration file that is present and wrong stops the run before any
+// request: exit 78 (workspace DR-0003 class config).
+func TestWrongConfigurationFileExits78BeforeFetching(t *testing.T) {
+	p := configHome(t)
+	os.MkdirAll(filepath.Dir(p), 0o755)
+	os.WriteFile(p, []byte("user-agent: [unclosed\n"), 0o644)
+	srv, seen := userAgentSite(t)
+	code, _, errs := run("-dump", "-style", "notty", srv.URL+"/p.md")
+	if code != 78 {
+		t.Fatalf("code %d, stderr %q", code, errs)
+	}
+	if !strings.HasPrefix(errs, "cmarkbrowser: ") || !strings.Contains(errs, p) {
+		t.Errorf("stderr %q", errs)
+	}
+	if len(seen()) != 0 {
+		t.Errorf("a request was made: %v", seen())
+	}
+}
+
+func TestHelpDocumentsTheConfigurationFileAndExit78(t *testing.T) {
+	_, out, _ := run("-h")
+	for _, want := range []string{"~/.config/cmarkbrowser/cmarkbrowser.yaml", "user-agent", "78"} {
+		if !strings.Contains(out, want) {
+			t.Errorf("help lacks %q", want)
+		}
+	}
+}
+
+func TestDebugLogStartEventRecordsTheUserAgent(t *testing.T) {
+	configHome(t)
+	srv, _ := userAgentSite(t)
+	logPath := filepath.Join(t.TempDir(), "d.jsonl")
+	if code, _, errs := run("-dump", "-style", "notty", "-debug", logPath, srv.URL+"/p.md"); code != 0 {
+		t.Fatalf("code %d, stderr %q", code, errs)
+	}
+	b, _ := os.ReadFile(logPath)
+	first := strings.SplitN(string(b), "\n", 2)[0]
+	if !strings.Contains(first, `"user_agent":"cmarkbrowser/`) {
+		t.Errorf("start event %s", first)
 	}
 }

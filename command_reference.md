@@ -144,6 +144,18 @@ text, links and pictures that have alt text, without scripts, styles or menus.
 -v, -version
 : Show the version.
 
+## CONFIGURATION
+
+If ~/.config/cmarkbrowser/cmarkbrowser.yaml exists ($XDG_CONFIG_HOME is used when
+set) it is read before anything is fetched. A missing file is fine; a file that
+is there and wrong is an error (exit 78). Settings so far:
+
+user-agent
+: The User-Agent sent with every request, so a site can tell who is asking.
+  The default is cmarkbrowser/VERSION. Example:
+
+      user-agent: cmarkbrowser/0.0.2 (+https://example.org/about)
+
 ## EXIT STATUS
 
 0
@@ -171,3 +183,6 @@ text, links and pictures that have alt text, without scripts, styles or menus.
 
 77
 : The operating system refused access to the path named.
+
+78
+: The configuration file is there and wrong.

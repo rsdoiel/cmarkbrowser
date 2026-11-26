@@ -47,8 +47,12 @@ is not accepted here (see Local sites). `Esc` cancels.
 front matter as `urlNext` and `urlPrev`. When it names none, cmarkbrowser asks the
 site's table of contents, `/.well-known/toc.opml`: it reads the site root's file
 first, then the folders between the root and the page, and follows the outlines
-it includes from the same site. A site with no table of contents says so in the
-status line.
+it includes from the same site. As in BonBon, the outline is read as one list,
+top to bottom, a page with outlines under it before them: `]` is the line below
+the page and `[` the line above. Groups do not stop the arrows and the ends
+wrap, from the last line to the first. A site the outline includes is a list of
+its own, so its last page wraps to its first. A site with no table of contents
+says so in the status line.
 
 ## Searching
 

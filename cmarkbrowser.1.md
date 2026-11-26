@@ -1,4 +1,4 @@
-%cmarkbrowser(1) user manual | version 0.0.2 6e78305
+%cmarkbrowser(1) user manual | version 0.0.3 28e4374
 % R. S. Doiel
 % 2026-11-26
 
@@ -27,7 +27,9 @@ and press Enter. b and f go back and forward; ] and [ open the next and
 previous page that the page names in its urlNext and urlPrev front matter, or,
 when it names none, that the site's table of contents gives (the nearest
 .well-known/toc.opml above the page, with the outlines it includes; read the
-first time one of these keys needs it, and remembered); Esc
+first time one of these keys needs it, and remembered). As in BonBon the
+outline is one list: ] is the line below the page, [ the line above, the ends
+wrap, and a site the outline includes is a list of its own; Esc
 clears a typed number, then the focus, then a search; arrows, PgUp, PgDn, space,
 g and G scroll; q quits.
 
@@ -143,6 +145,18 @@ text, links and pictures that have alt text, without scripts, styles or menus.
 -v, -version
 : Show the version.
 
+# CONFIGURATION
+
+If ~/.config/cmarkbrowser/cmarkbrowser.yaml exists ($XDG_CONFIG_HOME is used when
+set) it is read before anything is fetched. A missing file is fine; a file that
+is there and wrong is an error (exit 78). Settings so far:
+
+user-agent
+: The User-Agent sent with every request, so a site can tell who is asking.
+  The default is cmarkbrowser/VERSION. Example:
+
+      user-agent: cmarkbrowser/0.0.2 (+https://example.org/about)
+
 # EXIT STATUS
 
 0
@@ -170,3 +184,6 @@ text, links and pictures that have alt text, without scripts, styles or menus.
 
 77
 : The operating system refused access to the path named.
+
+78
+: The configuration file is there and wrong.

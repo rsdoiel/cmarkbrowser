@@ -29,7 +29,9 @@
     "Go >= 1.27.4"
   ],
   "softwareRequirements": [
-    "Go >= 1.27.4"
+    "Go >= 1.27.4",
+    "github.com/rsdoiel/frontmatter >= 0.0.1",
+    "github.com/rsdoiel/markdownweb >= 0.0.4"
   ],
   "softwareSuggestions": [
     "CMTools >= 0.0.46",
@@ -38,10 +40,10 @@
     "jq, zip and the GitHub CLI (gh), to cut a release",
     "Bash or PowerShell"
   ],
-  "version": "0.0.2",
+  "version": "0.0.3",
   "developmentStatus": "wip",
   "issueTracker": "https://github.com/rsdoiel/cmarkbrowser/issues",
-  "releaseNotes": "v0.0.2 is a working a proof of concept. \n\nUpgraded module organization, add github.com/rsdoiel/markdownweb dependency",
+  "releaseNotes": "- ] and [ follow BonBon's rule for a page that names no urlPrev and urlNext (markdownweb v0.0.4, DR-0004): the outline is one flat list, the line below is next and the line above previous, the ends wrap, groups do not stop the arrows, and a list with calendar outlines is no longer reversed. A site the outline includes is a list of its own. A neighbour with nothing at its address is not skipped yet.\n- markdownweb is v0.0.4: requests go through its polite fetcher, so the User-Agent is cmarkbrowser/VERSION, or the user-agent setting in ~/.config/cmarkbrowser/cmarkbrowser.yaml (a wrong file exits 78); new internal/config.\n- Front matter and {{page.NAME}} macros come from github.com/rsdoiel/frontmatter; goldmark is v1.8.7; Needs Go 1.27.4.",
   "copyrightYear": 2026,
   "copyrightHolder": "R. S. Doiel"
 }

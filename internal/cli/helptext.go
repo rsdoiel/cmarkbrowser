@@ -36,7 +36,9 @@ and press Enter. b and f go back and forward; ] and [ open the next and
 previous page that the page names in its urlNext and urlPrev front matter, or,
 when it names none, that the site's table of contents gives (the nearest
 .well-known/toc.opml above the page, with the outlines it includes; read the
-first time one of these keys needs it, and remembered); Esc
+first time one of these keys needs it, and remembered). As in BonBon the
+outline is one list: ] is the line below the page, [ the line above, the ends
+wrap, and a site the outline includes is a list of its own; Esc
 clears a typed number, then the focus, then a search; arrows, PgUp, PgDn, space,
 g and G scroll; q quits.
 

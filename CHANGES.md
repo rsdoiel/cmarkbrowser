@@ -4,7 +4,7 @@ v0.0.0 is the prototype, a proof of concept: it shows that a terminal browser
 can read the Markdown web and preview a Markdown site. From v0.0.1, if the work
 continues, the development status becomes WIP.
 
-## Unreleased
+## v0.0.3, 2026-11-26
 
 - **Behaviour change:** `]` and `[` on a page that names no `urlPrev` and `urlNext` follow BonBon's rule (markdownweb v0.0.4, DR-0004): the outline is one flat list, previous is the line above, next the line below, and the ends wrap. Arrows no longer stop at the end of a group, cross-group steps are allowed, and a list with calendar outlines is no longer reversed (the line below is next, the older day in a newest-first file). A site included in the outline is a list of its own: its first and last pages wrap inside it. A page that names its neighbours in front matter is unchanged. A neighbour with nothing at its address is not skipped yet.
 - markdownweb is v0.0.4 (it was v0.0.3): requests go through its polite fetcher. The User-Agent was Go's `Go-http-client/1.1`; it is now `cmarkbrowser/VERSION`, or the `user-agent` setting in `~/.config/cmarkbrowser/cmarkbrowser.yaml`. A missing file is fine; one that is there and wrong exits 78. The file is read before anything is fetched. New package `internal/config`; `gopkg.in/yaml.v3` is now a direct dependency.

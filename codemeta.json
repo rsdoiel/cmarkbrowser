@@ -38,10 +38,10 @@
     "jq, zip and the GitHub CLI (gh), to cut a release",
     "Bash or PowerShell"
   ],
-  "version": "0.0.1",
+  "version": "0.0.2",
   "developmentStatus": "wip",
   "issueTracker": "https://github.com/rsdoiel/cmarkbrowser/issues",
-  "releaseNotes": "v0.0.1 is a working a proof of concept. \n\nUpgraded Go version to v1.27, updated module organization and Goldmark dpendencies.",
+  "releaseNotes": "v0.0.2 is a working a proof of concept. \n\nUpgraded module organization, add github.com/rsdoiel/markdownweb dependency",
   "copyrightYear": 2026,
   "copyrightHolder": "R. S. Doiel"
 }

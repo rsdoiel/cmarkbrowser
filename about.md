@@ -10,7 +10,7 @@ authors:
 
 
 repository_code: https://github.com/rsdoiel/cmarkbrowser
-version: 0.0.1
+version: 0.0.2
 license_url: https://www.gnu.org/licenses/agpl-3.0.txt
 
 programming_language:
@@ -30,11 +30,11 @@ date_released: 2026-11-26
 About this software
 ===================
 
-## cmarkbrowser 0.0.1
+## cmarkbrowser 0.0.2
 
-v0.0.1 is a working a proof of concept. 
+v0.0.2 is a working a proof of concept. 
 
-Upgraded Go version to v1.27, updated module organization and Goldmark dpendencies.
+Upgraded module organization, add github.com/rsdoiel/markdownweb dependency
 
 ## Authors
 

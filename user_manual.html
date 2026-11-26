@@ -35,11 +35,28 @@ scroll. <code>q</code> quits.</p>
 <p>Links are numbered, like <code>[3]</code>. Press Tab to move to the
 next link, Shift-Tab to the previous one, and Enter to follow the
 focused link. Or type a link’s number and press Enter. <code>b</code>
-goes back and <code>f</code> goes forward. Esc undoes one thing: a typed
-number, then the focus, then a search.</p>
+goes back and <code>f</code> goes forward, each to the place on the page
+where you left it. Esc undoes one thing: a typed number, then the focus,
+then a search.</p>
 <p>A page is Markdown with optional front matter. HTML inside a page is
 removed, as a BonBon browser does, and a page cannot change how it
 looks.</p>
+<p>Front matter is a YAML block at the very top of the file: a first
+line of <code>---</code>, then the block, closed by a line of
+<code>---</code> or <code>...</code>. If the block is never closed the
+whole file is shown as it is and the status line says the front matter
+is not closed (<code>-dump</code> says so on standard error). A block
+that is not valid YAML, or is not a list of keys and values, makes the
+page an error (exit 65).</p>
+<p>In the text of a page, <code>{{page.NAME}}</code> is replaced by the
+front matter value NAME (spaces inside the braces are allowed, and
+<code>{{page.source.title}}</code> reaches into a table), except in
+code. A name the page does not have stays as written and is reported.
+When the page has a <code>link</code> value, the expanded
+<code>title</code> is a link to it. Includes
+(<code>@include-text-block</code>) are not expanded: they are a step the
+server or the build does before it publishes a page, so a page that
+still holds one shows it as text.</p>
 <h2 id="opening-an-address">Opening an address</h2>
 <p>Press <code>o</code>, type an address and press Enter. An address
 starts with <code>http://</code> or <code>https://</code>; a bare host
@@ -120,33 +137,33 @@ a numbered list of its links to standard output, and
 <h2 id="exit-codes">Exit codes</h2>
 <table>
 <thead>
-<tr class="header">
+<tr>
 <th scope="col">Code</th>
 <th scope="col">Meaning</th>
 </tr>
 </thead>
 <tbody>
-<tr class="odd">
+<tr>
 <td>0</td>
 <td>Success.</td>
 </tr>
-<tr class="even">
+<tr>
 <td>2</td>
 <td>Bad command line.</td>
 </tr>
-<tr class="odd">
+<tr>
 <td>65</td>
 <td>The page is not text, or its front matter is not valid.</td>
 </tr>
-<tr class="even">
+<tr>
 <td>66</td>
 <td>The page, path or index.md is not there.</td>
 </tr>
-<tr class="odd">
+<tr>
 <td>69</td>
 <td>The server cannot be reached.</td>
 </tr>
-<tr class="even">
+<tr>
 <td>77</td>
 <td>The operating system refused access to the path.</td>
 </tr>

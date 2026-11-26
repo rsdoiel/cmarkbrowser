@@ -4,7 +4,7 @@ message: "If you use this software, please cite it as below."
 type: software
 title: cmarkbrowser
 abstract: |-
-  A terminal browser for the Markdown web, after Dave Winer's BonBon: it fetches pages as Markdown, strips HTML, follows links and a site's table of contents, and lets the reader choose how the text looks.
+  A terminal browser for the Markdown Web inspired by Dave Winer's BonBon: it fetches pages as Markdown, strips HTML, follows links and a site's table of contents, and lets the reader choose how the text looks.
 authors:
   - family-names: Doiel
     given-names: R. S.
@@ -13,8 +13,8 @@ authors:
 
 
 repository-code: "https://github.com/rsdoiel/cmarkbrowser"
-version: 0.0.0
-date-released: 2026-11-20
+version: 0.0.1
+date-released: 2026-11-26
 
 license-url: "https://www.gnu.org/licenses/agpl-3.0.txt"
 keywords:

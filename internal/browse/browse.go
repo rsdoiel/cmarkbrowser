@@ -15,6 +15,7 @@ import (
 	"github.com/rsdoiel/cmarkbrowser/internal/debuglog"
 	"github.com/rsdoiel/cmarkbrowser/internal/page"
 	"github.com/rsdoiel/cmarkbrowser/internal/render"
+	"github.com/rsdoiel/frontmatter"
 )
 
 /** Link is a numbered link with its destination resolved against the page.
@@ -44,6 +45,9 @@ type Link struct {
  *   Links ([]Link) — the numbered links, in reading order
  *   Missing ([]string) — {{page.KEY}} macros left in the text because the
  *     front matter has no such value
+ *   Notes ([]string) — what the person should be told about the page that does
+ *     not stop it showing: the page's own Notice and any warning from macro
+ *     expansion (an unusable link value)
  *   Site (*local.Site) — the site root when the page is a local page of a site
  *     the person opened (OpenLocal); nil for a web page and for files such as
  *     the bookmarks file, whose links are never paths
@@ -54,6 +58,7 @@ type View struct {
 	Text    string
 	Links   []Link
 	Missing []string
+	Notes   []string
 	Site    *local.Site
 
 	lines map[int]int // link number -> line of its marker in Text
@@ -186,8 +191,15 @@ func build(ctx context.Context, addr string, p *page.Page, site *local.Site, r r
 	log := debuglog.FromContext(ctx)
 	t1 := time.Now()
 	body, missing := p.Body, []string(nil)
+	var notes []string
+	if p.Notice != "" {
+		notes = append(notes, p.Notice)
+	}
 	if !p.Reader { // {{page.NAME}} macros are Markdown-web front matter, not HTML text
-		body, missing = render.Expand(p.Body, p.Meta)
+		var rep frontmatter.Report
+		body, rep = frontmatter.Expand(p.Body, p.Meta)
+		missing = rep.Missing
+		notes = append(notes, rep.Warnings...)
 	}
 	if !p.Reader {
 		// A terminal cannot float a picture into the margin: show its alt text,
@@ -202,7 +214,7 @@ func build(ctx context.Context, addr string, p *page.Page, site *local.Site, r r
 		return nil, fmt.Errorf("rendering %s: %w", addr, err)
 	}
 	t4 := time.Now()
-	v := &View{Page: p, Clean: clean, Text: text, Missing: missing, Site: site, log: log}
+	v := &View{Page: p, Clean: clean, Text: text, Missing: missing, Notes: notes, Site: site, log: log}
 	v.index()
 	for _, l := range links {
 		if site != nil {

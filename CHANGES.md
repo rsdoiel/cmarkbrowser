@@ -4,6 +4,19 @@ v0.0.0 is the prototype, a proof of concept: it shows that a terminal browser
 can read the Markdown web and preview a Markdown site. From v0.0.1, if the work
 continues, the development status becomes WIP.
 
+## Unreleased
+
+- Front matter and `{{page.NAME}}` macros now come from github.com/rsdoiel/frontmatter (v0.0.1), the module antennaApp and others share. Changes you may notice:
+  - a front matter block can also be closed by a `...` line;
+  - a block that is never closed no longer passes silently: the whole file is shown and the status line (and `-dump`, on standard error) says it is not closed;
+  - a page's line endings are kept as they were (a CRLF page is no longer rewritten);
+  - a bare date in a macro shows as `2026-11-19`, not `2026-11-19 00:00:00 +0000 UTC`;
+  - a macro value that begins like a heading or a list (`# `, `- `, `1. `) is shown as text, not as markup;
+  - the expanded `title` is a link when the page has a `link` value (http, https, mailto or relative; anything else is ignored and noted).
+- goldmark is now v1.8.7. A bare address followed by `)` in text (`(see https://example.org/x).`) now keeps the `)` out of the address, as GitHub does.
+- Needs Go 1.27.4 (the frontmatter module's minimum).
+- Includes are deliberately not supported: they are a server-side step.
+
 ## v0.0.0 — 2026-11-20 (prototype)
 
 ### Added

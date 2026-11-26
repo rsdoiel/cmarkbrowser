@@ -238,9 +238,12 @@ func (m Model) loaded(msg loadMsg) Model {
 	m.log.Event("load.done", "addr", msg.addr, "final", msg.v.Page.URL, "ok", true, "idx", msg.idx, "ms", msg.took,
 		"links", len(msg.v.Links), "missing_keys", msg.v.Missing)
 	m.status = ""
+	var told []string
 	if len(msg.v.Missing) > 0 {
-		m.status = "no front matter value for {{page." + strings.Join(msg.v.Missing, "}}, {{page.") + "}}"
+		told = append(told, "no front matter value for {{page."+strings.Join(msg.v.Missing, "}}, {{page.")+"}}")
 	}
+	told = append(told, msg.v.Notes...)
+	m.status = strings.Join(told, "; ")
 	// remember where the page being left was scrolled to, for going back to it
 	if m.view != nil && m.idx >= 0 && m.idx < len(m.offs) {
 		m.offs[m.idx] = m.vp.YOffset()

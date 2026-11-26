@@ -21,6 +21,20 @@ number, then the focus, then a search.
 A page is Markdown with optional front matter. HTML inside a page is removed, as
 a BonBon browser does, and a page cannot change how it looks.
 
+Front matter is a YAML block at the very top of the file: a first line of `---`,
+then the block, closed by a line of `---` or `...`. If the block is never closed
+the whole file is shown as it is and the status line says the front matter is not
+closed (`-dump` says so on standard error). A block that is not valid YAML, or is
+not a list of keys and values, makes the page an error (exit 65).
+
+In the text of a page, `{{page.NAME}}` is replaced by the front matter value NAME
+(spaces inside the braces are allowed, and `{{page.source.title}}` reaches into a
+table), except in code. A name the page does not have stays as written and is
+reported. When the page has a `link` value, the expanded `title` is a link to it.
+Includes (`@include-text-block`) are not expanded: they are a step the server or
+the build does before it publishes a page, so a page that still holds one shows
+it as text.
+
 ## Opening an address
 
 Press `o`, type an address and press Enter. An address starts with `http://` or

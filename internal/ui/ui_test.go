@@ -1365,3 +1365,16 @@ func TestEachHistoryEntryKeepsItsOwnScrollPosition(t *testing.T) {
 		t.Error("back after a new visit lost the position")
 	}
 }
+
+func TestTheStatusLineSaysWhenFrontMatterIsNotClosed(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/markdown")
+		fmt.Fprint(w, "---\ntitle: T\nnever closed\n\n# Heading\n")
+	}))
+	t.Cleanup(srv.Close)
+	m := New(srv.URL+"/u.md", render.Glamour{Style: "notty"})
+	m = drive(t, m, m.Init())
+	if !strings.Contains(m.status, "not closed") {
+		t.Errorf("status %q", m.status)
+	}
+}

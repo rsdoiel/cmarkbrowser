@@ -180,6 +180,9 @@ func runDump(ctx context.Context, arg string, site *localpkg.Site, r render.Rend
 	for _, key := range v.Missing {
 		fmt.Fprintf(stderr, "cmarkbrowser: warning: %s: no front matter value for {{page.%s}}\n", v.Page.URL, key)
 	}
+	for _, note := range v.Notes {
+		fmt.Fprintf(stderr, "cmarkbrowser: warning: %s: %s\n", v.Page.URL, note)
+	}
 	fmt.Fprint(stdout, v.Display(-1))
 	if len(v.Links) > 0 {
 		fmt.Fprintln(stdout, "\nLinks:")

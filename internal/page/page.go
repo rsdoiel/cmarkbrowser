@@ -19,8 +19,8 @@ import (
 
 	"github.com/rsdoiel/cmarkbrowser/internal/debuglog"
 	"github.com/rsdoiel/cmarkbrowser/internal/reader"
+	"github.com/rsdoiel/frontmatter"
 	"golang.org/x/net/html"
-	"gopkg.in/yaml.v3"
 )
 
 // Sentinels for the DR-0003 classes a fetch can fail in. Wrap with %w.
@@ -69,6 +69,8 @@ const maxBody = 8 << 20
  *   Reader (bool) — Body is a reader view made from an HTML page
  *   Raw (string) — the page as received, front matter included, for saving a
  *     copy to edit; empty for a reader view
+ *   Notice (string) — a problem with the page that does not stop it showing,
+ *     such as a front matter block that is never closed; empty when all is well
  */
 type Page struct {
 	URL  string
@@ -79,6 +81,7 @@ type Page struct {
 	// as text, or a note about an image or a file (FetchOther). "" for Markdown
 	// and for a reader view.
 	Kind   Kind
+	Notice string
 	Reader bool // the Body is a reader view of an HTML page, not the page's own Markdown
 }
 
@@ -120,50 +123,34 @@ func (p *Page) URLNext() string { return p.str("urlNext") }
  */
 func (p *Page) URLPrev() string { return p.str("urlPrev") }
 
-/** Parse splits optional YAML front matter (between two lines of three
- * dashes at the very start) from the Markdown body. A leading block that is
- * never closed is not front matter and stays in the body.
+/** Parse splits optional YAML front matter from the Markdown body with the
+ * frontmatter module's rules: a block starts on a first line that is exactly
+ * "---" and ends at the next line that is exactly "---" or "..."; the body is
+ * the original bytes after it. A block that is never closed is not an error
+ * here: the whole file is the body and the page carries a Notice, so the person
+ * sees the file and is told.
  *
  * Parameters:
  *   src ([]byte) — the page as served
  *
  * Returns:
  *   *Page — the page, with Meta never nil
- *   error — wraps ErrData when the front matter is not valid YAML
+ *   error — wraps ErrData when the front matter is not valid YAML or is not a mapping
  *
  * Example:
  *   p, err := page.Parse([]byte("---\ntitle: Hi\n---\ntext\n"))
  */
 func Parse(src []byte) (*Page, error) {
 	p := &Page{Meta: map[string]any{}, Body: string(src), Raw: string(src)}
-	s := strings.ReplaceAll(string(src), "\r\n", "\n")
-	if !strings.HasPrefix(s, "---\n") {
+	meta, body, err := frontmatter.Split(src)
+	switch {
+	case errors.Is(err, frontmatter.ErrUnclosed):
+		p.Notice = "front matter is not closed (no closing --- or ... line): showing the whole file"
 		return p, nil
+	case err != nil:
+		return nil, fmt.Errorf("%w: %s", ErrData, err)
 	}
-	rest := s[4:]
-	end := strings.Index("\n"+rest, "\n---\n")
-	tail := ""
-	if end < 0 {
-		if strings.HasSuffix(rest, "\n---") {
-			end, tail = len(rest)-4, ""
-			end++
-		} else {
-			return p, nil
-		}
-	} else {
-		tail = rest[end+4:]
-		if end > 0 {
-			end--
-		}
-	}
-	block := rest[:max(end, 0)]
-	if err := yaml.Unmarshal([]byte(block), &p.Meta); err != nil {
-		return nil, fmt.Errorf("%w: front matter: %s", ErrData, err)
-	}
-	if p.Meta == nil {
-		p.Meta = map[string]any{}
-	}
-	p.Body = tail
+	p.Meta, p.Body = meta, string(body)
 	return p, nil
 }
 

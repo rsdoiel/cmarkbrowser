@@ -438,3 +438,22 @@ func TestDumpShowsANonMarkdownFileAsSourceOrANote(t *testing.T) {
 		t.Errorf("image: exit %d\n%s\n%s", code, out, errs)
 	}
 }
+
+func TestDumpSaysWhenFrontMatterIsNotClosed(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/markdown")
+		w.Write([]byte("---\ntitle: T\nnever closed\n\n# Heading\n"))
+	}))
+	defer srv.Close()
+	var out, errb bytes.Buffer
+	code := Run([]string{"-dump", "-style", "notty", srv.URL + "/p.md"}, &out, &errb)
+	if code != ExitOK {
+		t.Fatalf("exit %d: %s", code, errb.String())
+	}
+	if !strings.Contains(errb.String(), "cmarkbrowser: warning:") || !strings.Contains(errb.String(), "not closed") {
+		t.Errorf("stderr %q", errb.String())
+	}
+	if !strings.Contains(out.String(), "Heading") || strings.Contains(out.String(), "warning") {
+		t.Errorf("stdout %q", out.String())
+	}
+}

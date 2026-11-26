@@ -44,7 +44,7 @@ https://rsdoiel.github.io/blog/index.md and https://rsdoiel.github.io/antenna/in
 
 ## Found on Dave's site (2026-11-19)
 
-- [x] (2026-11-19) `render.Expand` expands `{{page.KEY}}` from the front matter before `Prepare`: text only (not code spans or blocks), one pass, values escaped, dotted keys reach nested tables (`source.title`), lists join with commas; a missing key (or a table) stays visible and is reported (`-dump` warns on stderr, the TUI shows it in the status line). Checked on https://dave.writersweb.org/scripting/2026/11/03/172109.md. Left: `link` turning the expanded title into a link (antennaApp's extension, DR-0009), and BonBon's own handling of nested keys, not checked against a running BonBon.
+- [x] (2026-11-19) `render.Expand` expands `{{page.KEY}}` from the front matter before `Prepare`: text only (not code spans or blocks), one pass, values escaped, dotted keys reach nested tables (`source.title`), lists join with commas; a missing key (or a table) stays visible and is reported (`-dump` warns on stderr, the TUI shows it in the status line). Checked on https://dave.writersweb.org/scripting/2026/11/03/172109.md. **2026-11-26: `render.Expand` moved to the frontmatter module (`frontmatter.Expand`, v0.0.1) and the title link (antennaApp's extension, DR-0009) is done there.** Left: BonBon's own handling of nested keys, not checked against a running BonBon.
 - [x] (2026-11-19) `n` and `p` open the page named by the current page's `urlNext` and `urlPrev` (resolved against its address, a new history entry; a status line says so when the key is absent; ignored while a link number is being typed; the footer hint lists them only when the page has them). `urlParent` is not used yet. Not yet from `/.well-known/toc.opml` when a page has no keys.
 - [x] The Markdown site mirrors an HTML site: `dave.writersweb.org/scripting/.well-known/bonbon.json` has `urlMirrorOf: http://scripting.com/`, `urlSearch` and `urlUpdateSocket`; `/.well-known/toc.opml` at the root has an `include` outline for it. scripting.com itself serves HTML only (no `index.md`, no `.well-known` files). Done as `urlMirrorOf` link translation (`internal/toc/mirror.go`, 2026-11-20); `urlSearch` and `urlUpdateSocket` are server features, see the bonbon.json item.
 
@@ -131,3 +131,10 @@ https://rsdoiel.github.io/blog/index.md and https://rsdoiel.github.io/antenna/in
 - [ ] If I am viewing a remote site page and open the url box and inter a path (full or relative) it is treated as having the current page's prefix hostname. Example, I have cmarkbrowser open to https://rsdoiel.github.io, then I press "o" to open a new url but instead of enter https://rsdoiel.github.io/antenna I just enter antenna the path would be combined with the current pages hostname to form the URL to be retrieved next. The retrieved page would be bookmark-able and in the history because it is still a remote URL.
 
 
+
+## frontmatter module (2026-11-26)
+
+- [x] `page.Parse` and macro expansion use github.com/rsdoiel/frontmatter v0.0.1 (session F5). An unclosed block shows the whole file with a notice (`Page.Notice`, `View.Notes`, status line, `-dump` warning); `...` closes a block; a CRLF body is kept; the old splitter and `render.Expand` are gone. goldmark rose from 1.7.8 to 1.8.7 and Go to 1.27.4 with it.
+- [x] Includes are not supported here by design (server-side only; frontmatter DR-0002).
+- [ ] A page whose front matter is not valid YAML (or not a mapping) is still an error (exit 65). A reader might show the body with a notice instead, as it does for an unclosed block; decide with the author.
+- [ ] `-debug`: add the notes to the `load.done` event.

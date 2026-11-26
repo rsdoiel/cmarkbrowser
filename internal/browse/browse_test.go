@@ -419,3 +419,56 @@ func TestPicturesAreAltTextLinksAndTheMarginImageNeedsAltText(t *testing.T) {
 		t.Errorf("a margin picture with no alt text should show nothing: %#v\n%s", v.Links, v.Text)
 	}
 }
+
+// --- F5: macros and front matter come from the frontmatter module ---
+
+func openBody(t *testing.T, body string) *View {
+	t.Helper()
+	srv := pageServer(t, body)
+	v, err := Open(context.Background(), srv.URL+"/p.md", render.Glamour{Style: "notty"}, 80)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return v
+}
+
+func TestAMacroShowsABareDateAsADate(t *testing.T) {
+	v := openBody(t, "---\ntitle: T\ndate: 2026-11-19\n---\nOn {{page.date}}.\n")
+	if !strings.Contains(v.Text, "On 2026-11-19.") || strings.Contains(v.Text, "00:00:00") {
+		t.Errorf("text %q", v.Text)
+	}
+}
+
+func TestTheTitleIsALinkWhenThePageHasALink(t *testing.T) {
+	v := openBody(t, "---\ntitle: Hello\nlink: https://x.example/story\n---\n# {{page.title}}\n")
+	if len(v.Links) != 1 || v.Links[0].URL != "https://x.example/story" || v.Links[0].Text != "Hello" {
+		t.Errorf("links %#v", v.Links)
+	}
+}
+
+func TestAnUnusableLinkValueIsNotedAndTheTitleStaysText(t *testing.T) {
+	v := openBody(t, "---\ntitle: Hello\nlink: \"javascript:alert(1)\"\n---\n# {{page.title}}\n")
+	if len(v.Links) != 0 || !strings.Contains(v.Text, "Hello") {
+		t.Errorf("links %#v, text %q", v.Links, v.Text)
+	}
+	if len(v.Notes) != 1 || !strings.Contains(v.Notes[0], "link") {
+		t.Errorf("Notes = %v", v.Notes)
+	}
+}
+
+func TestAValueThatWouldStartAHeadingIsShownAsText(t *testing.T) {
+	v := openBody(t, "---\ntitle: \"# Not a heading\"\n---\n{{page.title}}\n")
+	if !strings.Contains(v.Clean, `\# Not a heading`) {
+		t.Errorf("clean %q", v.Clean)
+	}
+}
+
+func TestAnUnclosedBlockIsShownAsTextAndNoted(t *testing.T) {
+	v := openBody(t, "---\ntitle: T\nthis block never closes\n\n# A heading\n")
+	if !strings.Contains(v.Text, "this block never closes") || !strings.Contains(v.Text, "A heading") {
+		t.Errorf("the whole file should show: %q", v.Text)
+	}
+	if len(v.Notes) != 1 || !strings.Contains(v.Notes[0], "not closed") {
+		t.Errorf("Notes = %v", v.Notes)
+	}
+}

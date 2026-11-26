@@ -4,7 +4,7 @@ import (
 	"context"
 	"flag"
 	"fmt"
-	localpkg "github.com/rsdoiel/cmarkbrowser/internal/local"
+	localpkg "github.com/rsdoiel/markdownweb/local"
 	"io"
 	"os"
 	"runtime"
@@ -15,9 +15,9 @@ import (
 
 	cmarkbrowser "github.com/rsdoiel/cmarkbrowser"
 	"github.com/rsdoiel/cmarkbrowser/internal/browse"
-	"github.com/rsdoiel/cmarkbrowser/internal/debuglog"
 	"github.com/rsdoiel/cmarkbrowser/internal/render"
 	"github.com/rsdoiel/cmarkbrowser/internal/ui"
+	"github.com/rsdoiel/markdownweb/debuglog"
 )
 
 const appName = "cmarkbrowser"

@@ -5,9 +5,9 @@ import (
 	"time"
 
 	tea "charm.land/bubbletea/v2"
-	"github.com/rsdoiel/cmarkbrowser/internal/debuglog"
-	"github.com/rsdoiel/cmarkbrowser/internal/local"
-	"github.com/rsdoiel/cmarkbrowser/internal/toc"
+	"github.com/rsdoiel/markdownweb/debuglog"
+	"github.com/rsdoiel/markdownweb/local"
+	"github.com/rsdoiel/markdownweb/toc"
 )
 
 // tocMsg is the answer of a table of contents lookup. page is the address the

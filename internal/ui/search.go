@@ -8,8 +8,8 @@ import (
 	"unicode/utf8"
 
 	tea "charm.land/bubbletea/v2"
-	"github.com/rsdoiel/cmarkbrowser/internal/debuglog"
 	"github.com/rsdoiel/cmarkbrowser/internal/search"
+	"github.com/rsdoiel/markdownweb/debuglog"
 )
 
 // refresh redraws the page in the viewport with the focus and search marks.

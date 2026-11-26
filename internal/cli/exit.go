@@ -6,7 +6,7 @@ import (
 	"errors"
 	"io/fs"
 
-	"github.com/rsdoiel/cmarkbrowser/internal/page"
+	"github.com/rsdoiel/markdownweb/page"
 )
 
 // Exit codes, per workspace DR-0003. Only the classes this program can

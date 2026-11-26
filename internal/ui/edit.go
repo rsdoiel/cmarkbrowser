@@ -6,7 +6,7 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 	"github.com/rsdoiel/cmarkbrowser/internal/edit"
-	"github.com/rsdoiel/cmarkbrowser/internal/local"
+	"github.com/rsdoiel/markdownweb/local"
 )
 
 // editDoneMsg is the end of an editor session. addr is the page that was being

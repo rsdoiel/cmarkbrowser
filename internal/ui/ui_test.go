@@ -12,10 +12,10 @@ import (
 	"testing"
 
 	tea "charm.land/bubbletea/v2"
-	"github.com/rsdoiel/cmarkbrowser/internal/debuglog"
 	"github.com/rsdoiel/cmarkbrowser/internal/render"
 	"github.com/rsdoiel/cmarkbrowser/internal/search"
-	"github.com/rsdoiel/cmarkbrowser/internal/toc"
+	"github.com/rsdoiel/markdownweb/debuglog"
+	"github.com/rsdoiel/markdownweb/toc"
 )
 
 func site(t *testing.T) *httptest.Server {

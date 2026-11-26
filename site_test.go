@@ -13,8 +13,8 @@ import (
 
 	"github.com/rsdoiel/cmarkbrowser"
 	"github.com/rsdoiel/cmarkbrowser/internal/cli"
-	"github.com/rsdoiel/cmarkbrowser/internal/local"
-	"github.com/rsdoiel/cmarkbrowser/internal/toc"
+	"github.com/rsdoiel/markdownweb/local"
+	"github.com/rsdoiel/markdownweb/toc"
 )
 
 // The documentation is a Markdown site (README.md and the pages beside it) that

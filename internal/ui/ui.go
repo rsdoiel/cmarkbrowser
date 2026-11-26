@@ -5,8 +5,8 @@ package ui
 import (
 	"context"
 	"fmt"
-	"github.com/rsdoiel/cmarkbrowser/internal/local"
-	"github.com/rsdoiel/cmarkbrowser/internal/page"
+	"github.com/rsdoiel/markdownweb/local"
+	"github.com/rsdoiel/markdownweb/page"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -15,10 +15,10 @@ import (
 	"charm.land/bubbles/v2/viewport"
 	tea "charm.land/bubbletea/v2"
 	"github.com/rsdoiel/cmarkbrowser/internal/browse"
-	"github.com/rsdoiel/cmarkbrowser/internal/debuglog"
 	"github.com/rsdoiel/cmarkbrowser/internal/render"
 	"github.com/rsdoiel/cmarkbrowser/internal/search"
-	"github.com/rsdoiel/cmarkbrowser/internal/toc"
+	"github.com/rsdoiel/markdownweb/debuglog"
+	"github.com/rsdoiel/markdownweb/toc"
 )
 
 // maxWidth keeps lines readable on a very wide terminal.

@@ -6,6 +6,7 @@ continues, the development status becomes WIP.
 
 ## Unreleased
 
+- The page, toc, local, reader and debuglog packages now come from github.com/rsdoiel/markdownweb (v0.0.1), shared with cmarkfind and antennaApp. The table of contents is read through github.com/rsdoiel/opml. No change of behaviour.
 - Front matter and `{{page.NAME}}` macros now come from github.com/rsdoiel/frontmatter (v0.0.1), the module antennaApp and others share. Changes you may notice:
   - a front matter block can also be closed by a `...` line;
   - a block that is never closed no longer passes silently: the whole file is shown and the status line (and `-dump`, on standard error) says it is not closed;

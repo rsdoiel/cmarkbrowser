@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"github.com/rsdoiel/cmarkbrowser/internal/page"
+	"github.com/rsdoiel/markdownweb/page"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -12,8 +12,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/rsdoiel/cmarkbrowser/internal/debuglog"
 	"github.com/rsdoiel/cmarkbrowser/internal/render"
+	"github.com/rsdoiel/markdownweb/debuglog"
 )
 
 func site(t *testing.T) *httptest.Server {

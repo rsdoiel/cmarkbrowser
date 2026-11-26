@@ -4,7 +4,7 @@ package browse
 import (
 	"context"
 	"fmt"
-	"github.com/rsdoiel/cmarkbrowser/internal/local"
+	"github.com/rsdoiel/markdownweb/local"
 	"net/url"
 	"path/filepath"
 	"regexp"
@@ -12,10 +12,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/rsdoiel/cmarkbrowser/internal/debuglog"
-	"github.com/rsdoiel/cmarkbrowser/internal/page"
 	"github.com/rsdoiel/cmarkbrowser/internal/render"
 	"github.com/rsdoiel/frontmatter"
+	"github.com/rsdoiel/markdownweb/debuglog"
+	"github.com/rsdoiel/markdownweb/page"
 )
 
 /** Link is a numbered link with its destination resolved against the page.

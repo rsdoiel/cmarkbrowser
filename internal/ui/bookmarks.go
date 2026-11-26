@@ -3,7 +3,7 @@ package ui
 import (
 	"errors"
 	"fmt"
-	"github.com/rsdoiel/cmarkbrowser/internal/local"
+	"github.com/rsdoiel/markdownweb/local"
 	"net/url"
 	"os"
 	"path/filepath"

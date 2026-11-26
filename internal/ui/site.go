@@ -5,7 +5,7 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 	"github.com/rsdoiel/cmarkbrowser/internal/browse"
-	"github.com/rsdoiel/cmarkbrowser/internal/local"
+	"github.com/rsdoiel/markdownweb/local"
 )
 
 /** WithSite says the start argument opened a local site: pages inside the

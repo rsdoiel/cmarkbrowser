@@ -11,8 +11,8 @@ import (
 	"testing"
 
 	tea "charm.land/bubbletea/v2"
-	"github.com/rsdoiel/cmarkbrowser/internal/local"
 	"github.com/rsdoiel/cmarkbrowser/internal/render"
+	"github.com/rsdoiel/markdownweb/local"
 )
 
 // siteDir makes a local site under a temp folder: the site root is its "site"

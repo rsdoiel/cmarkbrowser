@@ -6,7 +6,7 @@ require (
 	charm.land/bubbles/v2 v2.2.1
 	charm.land/bubbletea/v2 v2.1.1
 	charm.land/glamour/v2 v2.0.1
-	github.com/rsdoiel/cmarkfind v0.0.2-0.20261127192720-31e91c650dfa
+	github.com/rsdoiel/cmarkfind v0.0.2-0.20261127220155-7eacc4a306c7
 	github.com/rsdoiel/frontmatter v0.0.1
 	github.com/rsdoiel/markdownweb v0.0.6-0.20261127212007-3ec0cd8a5c56
 	github.com/yuin/goldmark v1.8.7
@@ -29,6 +29,7 @@ require (
 	github.com/clipperhouse/uax29/v2 v2.7.0 // indirect
 	github.com/dlclark/regexp2 v1.11.0 // indirect
 	github.com/dustin/go-humanize v1.0.1 // indirect
+	github.com/fxamacker/cbor/v2 v2.10.0 // indirect
 	github.com/glebarez/go-sqlite v1.23.0 // indirect
 	github.com/google/uuid v1.6.0 // indirect
 	github.com/gorilla/css v1.0.1 // indirect
@@ -42,6 +43,7 @@ require (
 	github.com/rivo/uniseg v0.4.7 // indirect
 	github.com/rsdoiel/opml v0.0.12 // indirect
 	github.com/temoto/robotstxt v1.1.2 // indirect
+	github.com/x448/float16 v0.8.4 // indirect
 	github.com/xo/terminfo v1.0.0 // indirect
 	github.com/yuin/goldmark-emoji v1.0.5 // indirect
 	golang.org/x/net v0.55.0 // indirect

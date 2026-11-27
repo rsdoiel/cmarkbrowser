@@ -70,14 +70,51 @@ one. A page can name them in its own front matter as
 cmarkbrowser asks the site’s table of contents,
 <code>/.well-known/toc.opml</code>: it reads the site root’s file first,
 then the folders between the root and the page, and follows the outlines
-it includes from the same site. A site with no table of contents says so
-in the status line.</p>
+it includes from the same site. As in BonBon, the outline is read as one
+list, top to bottom, a page with outlines under it before them:
+<code>]</code> is the line below the page and <code>[</code> the line
+above. Groups do not stop the arrows and the ends wrap, from the last
+line to the first. A site the outline includes is a list of its own, so
+its last page wraps to its first. A neighbour with nothing at its
+address (a non-2xx answer, or none) is passed over, as BonBon does: each
+address is asked about once, the answer is remembered, and at most 12
+candidates are tried per key press. A site with no table of contents
+says so in the status line.</p>
 <h2 id="searching">Searching</h2>
 <p>Press <code>/</code>, type a regular expression and press Enter.
 Every match is marked and the page scrolls to the first one.
 <code>n</code> and <code>N</code> go to the next and previous match. A
 pattern with no capital letters ignores case. <code>/</code> then Enter
 repeats the last search.</p>
+<h2 id="searching-the-sites-you-have-read">Searching the sites you have
+read</h2>
+<p>cmarkbrowser can search a corpus of pages that <a
+href="https://github.com/rsdoiel/cmarkfind">cmarkfind</a> keeps in one
+SQLite file. Nothing is sent anywhere by a search.</p>
+<ul>
+<li><code>S</code> asks for a query at the bottom of the screen; Enter
+runs it, <code>Esc</code> cancels. The query is words, “phrases”,
+<code>AND</code>, <code>OR</code>, <code>NOT</code> and
+<code>word*</code>; anything else is searched as plain words. The
+results are a page like any other: numbered links, the matching text,
+and a count that says how many pages the sites list but have not been
+fetched yet. <code>b</code> comes back to the results and runs the query
+again.</li>
+<li><code>F</code> fills the corpus from the site you are reading: one
+batch of 25 pages of the table of contents that lists the page (a local
+site is filled whole). Press <code>F</code> again for the next batch.
+Nothing is added to the corpus unless you press <code>F</code>.</li>
+<li><code>cmarkbrowser -find QUERY</code> prints the results page’s
+Markdown on standard output, with no browser, for scripts. It exits 0
+with matches, 1 with none, 66 when there is no corpus and 65 when the
+file is not a corpus or is newer than this program reads.</li>
+</ul>
+<p>The corpus file is named by <code>-corpus FILE</code>, else the
+<code>corpus</code> key of the configuration file, else
+<code>CMARKFIND_DB</code>, else cmarkfind’s own default.
+<code>-no-corpus</code> turns <code>S</code> and <code>F</code> off.
+Fill a big site, or keep one up to date, with the <code>cmarkfind</code>
+program.</p>
 <h2 id="history-and-bookmarks">History and bookmarks</h2>
 <p>Every web page you visit is added to <code>history.md</code> in the
 folder you started in, newest first, and <code>H</code> opens it as a
@@ -134,8 +171,23 @@ result.</p>
 a numbered list of its links to standard output, and
 <code>-style notty</code> leaves out the colors:</p>
 <pre class="shell"><code>cmarkbrowser -dump -style notty https://rsdoiel.github.io/blog/index.md | less</code></pre>
+<h2 id="configuration">Configuration</h2>
+<p>If <code>~/.config/cmarkbrowser/cmarkbrowser.yaml</code> exists
+(<code>$XDG_CONFIG_HOME</code> is used when set) cmarkbrowser reads it
+before it fetches anything. It holds two settings.
+<code>user-agent</code> is the User-Agent sent with every request,
+<code>cmarkbrowser/VERSION</code> unless you name another, and
+<code>corpus</code> is the cmarkfind corpus that <code>S</code> and
+<code>F</code> use:</p>
+<div class="sourceCode" id="cb4"><pre
+class="sourceCode yaml"><code class="sourceCode yaml"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a><span class="fu">user-agent</span><span class="kw">:</span><span class="at"> cmarkbrowser/0.0.4 (+https://example.org/about)</span></span>
+<span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a><span class="fu">corpus</span><span class="kw">:</span><span class="at"> ~/.local/share/cmarkfind/corpus.db</span></span></code></pre></div>
 <h2 id="exit-codes">Exit codes</h2>
 <table>
+<colgroup>
+<col style="width: 40%" />
+<col style="width: 60%" />
+</colgroup>
 <thead>
 <tr>
 <th scope="col">Code</th>
@@ -152,12 +204,18 @@ a numbered list of its links to standard output, and
 <td>Bad command line.</td>
 </tr>
 <tr>
+<td>1</td>
+<td><code>-find</code> found nothing.</td>
+</tr>
+<tr>
 <td>65</td>
-<td>The page is not text, or its front matter is not valid.</td>
+<td>The page is not text, or its front matter is not valid; or the
+corpus is not a corpus or is newer than this program reads.</td>
 </tr>
 <tr>
 <td>66</td>
-<td>The page, path or index.md is not there.</td>
+<td>The page, path or index.md is not there, or <code>-find</code> has
+no corpus to read.</td>
 </tr>
 <tr>
 <td>69</td>
@@ -166,6 +224,10 @@ a numbered list of its links to standard output, and
 <tr>
 <td>77</td>
 <td>The operating system refused access to the path.</td>
+</tr>
+<tr>
+<td>78</td>
+<td>The configuration file is there and wrong.</td>
 </tr>
 </tbody>
 </table>

@@ -4,6 +4,13 @@ v0.0.0 is the prototype, a proof of concept: it shows that a terminal browser
 can read the Markdown web and preview a Markdown site. From v0.0.1, if the work
 continues, the development status becomes WIP.
 
+## v0.0.4, 2026-11-26
+
+- **Corpus search and fill** (cmarkbrowser DR-0003, with cmarkfind): `S` asks for a query and shows the results of a cmarkfind corpus as a page (numbered links, matching text, how many listed pages are not fetched yet; `b` runs the query again). `F` fills the corpus from the site being read, one batch of 25 pages per press (a local site whole); nothing is added unless `F` is pressed. `-corpus FILE`, the `corpus` key and `CMARKFIND_DB` name the file, cmarkfind's default otherwise; `-no-corpus` turns it off. `-find QUERY` prints the results page for scripts (exit 0 matches, 1 none, 66 no corpus, 65 not a corpus). Stored text is escaped so a result can make no link of its own. This adds cmarkfind v0.0.1 (and its pure-Go SQLite driver, no cgo) as a dependency.
+- markdownweb is v0.0.5.
+- `-help index` lists eleven help topics, and `-help TOPIC` shows one: reading, neighbours, search, corpus, bookmarks, local, editing, files, debug, config and exit-status. Each is a section 7 manual page, `cmarkbrowser-TOPIC.7.md`, written by `make build` and installed with the man pages. The `-help` page has a SEE ALSO that lists them. `-help` with a URL after it (it used to print the help) is now a usage error unless the word is a topic.
+- `]` and `[` pass over a neighbour with nothing at its address (a non-2xx answer or none), as BonBon does (markdownweb DR-0004 Q1). Each address is asked about once and the answer is remembered; at most 12 candidates are tried per key press. Web pages only; a local site already skipped missing files.
+
 ## v0.0.3, 2026-11-26
 
 - **Behaviour change:** `]` and `[` on a page that names no `urlPrev` and `urlNext` follow BonBon's rule (markdownweb v0.0.4, DR-0004): the outline is one flat list, previous is the line above, next the line below, and the ends wrap. Arrows no longer stop at the end of a group, cross-group steps are allowed, and a list with calendar outlines is no longer reversed (the line below is next, the older day in a newest-first file). A site included in the outline is a list of its own: its first and last pages wrap inside it. A page that names its neighbours in front matter is unchanged. A neighbour with nothing at its address is not skipped yet.

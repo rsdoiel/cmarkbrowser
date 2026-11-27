@@ -108,7 +108,7 @@ func (m Model) record() Model {
 		return m
 	}
 	addr := m.view.Page.URL
-	if isFileAddr(addr) {
+	if isFileAddr(addr) || isCorpusAddr(addr) {
 		return m
 	}
 	if err := history.Record(m.histPath, m.view.Page.Title(), addr, time.Now()); err != nil {

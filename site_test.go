@@ -24,7 +24,7 @@ import (
 // built site reads in cmarkbrowser itself.
 
 // noPublish are the Markdown files that are not website pages.
-var noPublish = map[string]bool{"TODO.md": true, "index.md": true, "cmarkbrowser.1.md": true}
+var noPublish = map[string]bool{"TODO.md": true, "index.md": true, "cmarkbrowser.1.md": true, "history.md": true}
 
 // pageOrder is PAGE_ORDER from website.mak.
 func pageOrder(t *testing.T) []string {
@@ -46,7 +46,7 @@ func publishedPages(t *testing.T) []string {
 	all, _ := filepath.Glob("*.md")
 	var out []string
 	for _, f := range all {
-		if !noPublish[f] {
+		if !noPublish[f] && !strings.HasSuffix(f, ".7.md") {
 			out = append(out, f)
 		}
 	}

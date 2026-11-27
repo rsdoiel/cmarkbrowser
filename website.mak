@@ -13,8 +13,9 @@ BASE_URL = https://rsdoiel.github.io/cmarkbrowser/
 PANDOC = $(shell which pandoc)
 
 # Internal notes, not website pages. index.md is a copy of README.md made below.
-# cmarkbrowser.1.md is the man page source; command_reference.md is its website page.
-NO_PUBLISH = TODO.md index.md cmarkbrowser.1.md
+# history.md is the history cmarkbrowser writes in the folder it is run from (gitignored).
+# cmarkbrowser.1.md and cmarkbrowser-TOPIC.7.md are the man page sources; command_reference.md is its website page.
+NO_PUBLISH = TODO.md index.md cmarkbrowser.1.md history.md $(wildcard cmarkbrowser-*.7.md)
 
 MD_PAGES = $(filter-out $(NO_PUBLISH),$(shell ls -1 *.md))
 

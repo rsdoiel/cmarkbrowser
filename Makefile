@@ -23,7 +23,11 @@ MAN_PAGES_1 = $(patsubst %.1.md,%.1,$(wildcard *.1.md))
 
 # MAN_PAGES_5 = $(shell ls -1 *.5.md | sed -E 's/.5.md/.5/g')
 
-MAN_PAGES_7 = $(patsubst %.7.md,%.7,$(wildcard *.7.md))
+# TOPICS names the help topics, as `cmarkbrowser -help index` lists them (a test checks
+# this). Each is written to cmarkbrowser-TOPIC.7.md by `make build`.
+TOPICS = reading neighbours search corpus bookmarks local editing files debug config exit-status
+
+MAN_PAGES_7 = $(foreach p,$(PROGRAMS),$(addprefix $(p)-,$(addsuffix .7,$(TOPICS))))
 
 # The Markdown pages that go in a release archive beside the man page sources.
 DOC_PAGES = README.md INSTALL.md CHANGES.md user_manual.md bonbon.md command_reference.md about.md
@@ -90,6 +94,7 @@ $(PROGRAMS): $(PACKAGE) $(shell find cmd internal -name '*.go')
 	@mkdir -p bin
 	go build -o "bin/$@$(EXT)" cmd/$@/*.go
 	@./bin/$@ -help >$@.1.md
+	@for topic in $(TOPICS); do ./bin/$@ -help $$topic >$@-$$topic.7.md; done
 
 # docs writes the command reference page of the website from the program's own
 # help, so the two cannot differ (site_test.go checks it).

@@ -16,15 +16,15 @@ sized reader for the same pages, and a way to test what
 
 ## Status
 
-v0.0.0 is a prototype, a proof of concept, and it works: you can read the Markdown
-web with it today. From v0.0.1, if development continues, it becomes a work in
-progress (WIP).
+v0.0.4 is a work in progress (WIP), and it works: you can read the Markdown web
+with it today.
 
 - Open a page: `cmarkbrowser https://rsdoiel.github.io/blog/index.md`.
 - Follow links with Tab and Enter, or by number; back, forward, search, bookmarks,
   history, the next and previous page from the site's table of contents.
 - Browse a folder as a site: `cmarkbrowser ./`.
 - Edit the page you are reading in your own editor with `e`.
+- Search the sites you have read with `S`, and add the site you are reading to the corpus with `F`; the corpus is [cmarkfind](https://github.com/rsdoiel/cmarkfind)'s (`cmarkbrowser -find QUERY` for scripts).
 
 The [User Manual](user_manual.md) says how, the
 [Command Reference](command_reference.md) lists every key and option, and

@@ -7,6 +7,7 @@ import (
 	"io/fs"
 
 	"github.com/rsdoiel/cmarkbrowser/internal/config"
+	"github.com/rsdoiel/cmarkfind/corpus"
 	"github.com/rsdoiel/markdownweb/page"
 )
 
@@ -21,6 +22,7 @@ const (
 	ExitUnavailable  = 69
 	ExitInternal     = 70
 	ExitCantCreate   = 73
+	ExitTempFail     = 75
 	ExitNoPermission = 77
 	ExitConfig       = 78
 )
@@ -56,8 +58,10 @@ func ExitCode(err error) int {
 		return ExitCantCreate
 	case errors.Is(err, config.ErrConfig):
 		return ExitConfig
-	case errors.Is(err, page.ErrData):
+	case errors.Is(err, page.ErrData), errors.Is(err, corpus.ErrSchema):
 		return ExitData
+	case errors.Is(err, corpus.ErrLocked):
+		return ExitTempFail
 	case errors.Is(err, page.ErrNoInput):
 		return ExitNoInput
 	case errors.Is(err, page.ErrUnavailable):

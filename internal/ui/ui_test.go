@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
 
 	tea "charm.land/bubbletea/v2"
@@ -1391,5 +1392,99 @@ func TestTheStatusLineSaysWhenFrontMatterIsNotClosed(t *testing.T) {
 	m = drive(t, m, m.Init())
 	if !strings.Contains(m.status, "not closed") {
 		t.Errorf("status %q", m.status)
+	}
+}
+
+// probeSite lists four pages in one group, but "gone" has nothing at its
+// address, "broken" answers 500 and "moved" redirects to c. hits counts the
+// requests per path and method, so a test can say what the probe asked.
+func probeSite(t *testing.T) (*httptest.Server, func(method, path string) int) {
+	t.Helper()
+	var mu sync.Mutex
+	hits := map[string]int{}
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		mu.Lock()
+		hits[r.Method+" "+r.URL.Path]++
+		mu.Unlock()
+		switch r.URL.Path {
+		case "/.well-known/toc.opml":
+			w.Header().Set("Content-Type", "text/x-opml; charset=utf-8")
+			fmt.Fprintf(w, `<?xml version="1.0" encoding="UTF-8"?><opml version="2.0"><head/><body>
+			<outline text="Pages">
+				<outline text="A" url="http://%[1]s/a.md"/>
+				<outline text="Gone" url="http://%[1]s/gone.md"/>
+				<outline text="Broken" url="http://%[1]s/broken.md"/>
+				<outline text="C" url="http://%[1]s/c.md"/>
+				<outline text="D" url="http://%[1]s/d.md"/></outline>
+			</body></opml>`, r.Host)
+		case "/broken.md":
+			http.Error(w, "boom", 500)
+		case "/a.md", "/c.md", "/d.md":
+			w.Header().Set("Content-Type", "text/markdown")
+			fmt.Fprintf(w, "# Page %s\n", strings.ToUpper(strings.TrimSuffix(r.URL.Path[1:], ".md")))
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	t.Cleanup(srv.Close)
+	return srv, func(method, path string) int {
+		mu.Lock()
+		defer mu.Unlock()
+		return hits[method+" "+path]
+	}
+}
+
+// markdownweb DR-0004 Q1: a neighbour with nothing at its address is passed
+// over, as BonBon does, in both directions.
+func TestNextAndPreviousPassOverNeighboursThatDoNotAnswer(t *testing.T) {
+	srv, _ := probeSite(t)
+	m := openTOC(t, srv, "/a.md")
+	m = press(t, m, "]")
+	if out := m.View().Content; !strings.Contains(out, "Page C") {
+		t.Fatalf("] from A: gone.md (404) and broken.md (500) are skipped, so C:\n%s", out)
+	}
+	m = press(t, m, "[")
+	if out := m.View().Content; !strings.Contains(out, "Page A") {
+		t.Errorf("[ from C goes back over both to A:\n%s", out)
+	}
+}
+
+// When nothing in the list answers, the key says so and the page stays.
+func TestWhenNoNeighbourAnswersThePageStays(t *testing.T) {
+	srv, _ := probeSite(t)
+	m := openTOC(t, srv, "/d.md")
+	m = press(t, m, "]") // wraps to a.md, which answers
+	if out := m.View().Content; !strings.Contains(out, "Page A") {
+		t.Fatalf("wrap:\n%s", out)
+	}
+	only := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/.well-known/toc.opml":
+			fmt.Fprintf(w, `<opml version="2.0"><head/><body><outline text="x" url="http://%[1]s/a.md"/><outline text="x" url="http://%[1]s/x.md"/></body></opml>`, r.Host)
+		case "/a.md":
+			w.Header().Set("Content-Type", "text/markdown")
+			fmt.Fprint(w, "# Page A\n")
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer only.Close()
+	m = openTOC(t, only, "/a.md")
+	m = press(t, m, "]")
+	if out := m.View().Content; !strings.Contains(out, "no next page") || !strings.Contains(out, "Page A") {
+		t.Errorf("the only neighbour has nothing at its address:\n%s", out)
+	}
+}
+
+// An answer is asked for once. Going on and back over the same neighbours
+// reuses what the probe learned, so later key presses do not wait.
+func TestAProbeAnswerIsRemembered(t *testing.T) {
+	srv, hits := probeSite(t)
+	m := openTOC(t, srv, "/a.md")
+	m = press(t, m, "]", "[", "]", "[")
+	for _, p := range []string{"/gone.md", "/broken.md"} {
+		if n := hits("GET", p) + hits("HEAD", p); n != 1 {
+			t.Errorf("%s was asked about %d times, once is enough", p, n)
+		}
 	}
 }

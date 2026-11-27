@@ -27,11 +27,64 @@
 <p>v0.0.0 is the prototype, a proof of concept: it shows that a terminal
 browser can read the Markdown web and preview a Markdown site. From
 v0.0.1, if the work continues, the development status becomes WIP.</p>
-<h2 id="unreleased">Unreleased</h2>
+<h2 id="v0.0.4-2026-11-26">v0.0.4, 2026-11-26</h2>
 <ul>
-<li>Front matter and <code>{{page.NAME}}</code> macros now come from
+<li><strong>Corpus search and fill</strong> (cmarkbrowser DR-0003, with
+cmarkfind): <code>S</code> asks for a query and shows the results of a
+cmarkfind corpus as a page (numbered links, matching text, how many
+listed pages are not fetched yet; <code>b</code> runs the query again).
+<code>F</code> fills the corpus from the site being read, one batch of
+25 pages per press (a local site whole); nothing is added unless
+<code>F</code> is pressed. <code>-corpus FILE</code>, the
+<code>corpus</code> key and <code>CMARKFIND_DB</code> name the file,
+cmarkfind’s default otherwise; <code>-no-corpus</code> turns it off.
+<code>-find QUERY</code> prints the results page for scripts (exit 0
+matches, 1 none, 66 no corpus, 65 not a corpus). Stored text is escaped
+so a result can make no link of its own. This adds cmarkfind v0.0.1 (and
+its pure-Go SQLite driver, no cgo) as a dependency.</li>
+<li>markdownweb is v0.0.5.</li>
+<li><code>-help index</code> lists eleven help topics, and
+<code>-help TOPIC</code> shows one: reading, neighbours, search, corpus,
+bookmarks, local, editing, files, debug, config and exit-status. Each is
+a section 7 manual page, <code>cmarkbrowser-TOPIC.7.md</code>, written
+by <code>make build</code> and installed with the man pages. The
+<code>-help</code> page has a SEE ALSO that lists them.
+<code>-help</code> with a URL after it (it used to print the help) is
+now a usage error unless the word is a topic.</li>
+<li><code>]</code> and <code>[</code> pass over a neighbour with nothing
+at its address (a non-2xx answer or none), as BonBon does (markdownweb
+DR-0004 Q1). Each address is asked about once and the answer is
+remembered; at most 12 candidates are tried per key press. Web pages
+only; a local site already skipped missing files.</li>
+</ul>
+<h2 id="v0.0.3-2026-11-26">v0.0.3, 2026-11-26</h2>
+<ul>
+<li><p><strong>Behaviour change:</strong> <code>]</code> and
+<code>[</code> on a page that names no <code>urlPrev</code> and
+<code>urlNext</code> follow BonBon’s rule (markdownweb v0.0.4, DR-0004):
+the outline is one flat list, previous is the line above, next the line
+below, and the ends wrap. Arrows no longer stop at the end of a group,
+cross-group steps are allowed, and a list with calendar outlines is no
+longer reversed (the line below is next, the older day in a newest-first
+file). A site included in the outline is a list of its own: its first
+and last pages wrap inside it. A page that names its neighbours in front
+matter is unchanged. A neighbour with nothing at its address is not
+skipped yet.</p></li>
+<li><p>markdownweb is v0.0.4 (it was v0.0.3): requests go through its
+polite fetcher. The User-Agent was Go’s <code>Go-http-client/1.1</code>;
+it is now <code>cmarkbrowser/VERSION</code>, or the
+<code>user-agent</code> setting in
+<code>~/.config/cmarkbrowser/cmarkbrowser.yaml</code>. A missing file is
+fine; one that is there and wrong exits 78. The file is read before
+anything is fetched. New package <code>internal/config</code>;
+<code>gopkg.in/yaml.v3</code> is now a direct dependency.</p></li>
+<li><p>The page, toc, local, reader and debuglog packages now come from
+github.com/rsdoiel/markdownweb (v0.0.1), shared with cmarkfind and
+antennaApp. The table of contents is read through
+github.com/rsdoiel/opml. No change of behaviour.</p></li>
+<li><p>Front matter and <code>{{page.NAME}}</code> macros now come from
 github.com/rsdoiel/frontmatter (v0.0.1), the module antennaApp and
-others share. Changes you may notice:
+others share. Changes you may notice:</p>
 <ul>
 <li>a front matter block can also be closed by a <code>...</code>
 line;</li>
@@ -48,12 +101,12 @@ longer rewritten);</li>
 <code>link</code> value (http, https, mailto or relative; anything else
 is ignored and noted).</li>
 </ul></li>
-<li>goldmark is now v1.8.7. A bare address followed by <code>)</code> in
-text (<code>(see https://example.org/x).</code>) now keeps the
-<code>)</code> out of the address, as GitHub does.</li>
-<li>Needs Go 1.27.4 (the frontmatter module’s minimum).</li>
-<li>Includes are deliberately not supported: they are a server-side
-step.</li>
+<li><p>goldmark is now v1.8.7. A bare address followed by <code>)</code>
+in text (<code>(see https://example.org/x).</code>) now keeps the
+<code>)</code> out of the address, as GitHub does.</p></li>
+<li><p>Needs Go 1.27.4 (the frontmatter module’s minimum).</p></li>
+<li><p>Includes are deliberately not supported: they are a server-side
+step.</p></li>
 </ul>
 <h2 id="v0.0.0-2026-11-20-prototype">v0.0.0 — 2026-11-20
 (prototype)</h2>

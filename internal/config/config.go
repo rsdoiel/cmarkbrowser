@@ -28,6 +28,8 @@ const FileName = "cmarkbrowser.yaml"
  * Fields:
  *   UserAgent (string) — the User-Agent sent with every request (key user-agent);
  *     empty means cmarkbrowser/VERSION
+ *   Corpus (string) — the cmarkfind corpus file S, F and -find use (key corpus);
+ *     empty means CMARKFIND_DB, else cmarkfind's default
  *
  * Example:
  *   c, err := config.Load()
@@ -35,6 +37,7 @@ const FileName = "cmarkbrowser.yaml"
  */
 type Config struct {
 	UserAgent string `yaml:"user-agent"`
+	Corpus    string `yaml:"corpus"`
 }
 
 /** Path returns where the configuration file is, whether or not it exists.

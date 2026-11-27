@@ -24,10 +24,21 @@
 </nav>
 <section id="main-content">
 <h1 id="about-this-software">About this software</h1>
-<h2 id="cmarkbrowser-0.0.1">cmarkbrowser 0.0.1</h2>
-<p>v0.0.1 is a working a proof of concept.</p>
-<p>Upgraded Go version to v1.27, updated module organization and
-Goldmark dpendencies.</p>
+<h2 id="cmarkbrowser-0.0.4">cmarkbrowser 0.0.4</h2>
+<ul>
+<li>S searches a cmarkfind corpus (a SQLite3 FTS5 file) and shows the
+results as a page; F fills the corpus from the site being read, 25 pages
+a press; -corpus, -no-corpus, the corpus config key and CMARKFIND_DB
+name the file; -find QUERY prints the results for scripts (exit 0, 1
+none, 66 no corpus, 65 not a corpus). Stored text is escaped so a result
+can make no link of its own (cmarkbrowser DR-0003)</li>
+<li>] and [ pass over a neighbour with nothing at its address, as BonBon
+does: each address asked once, at most 12 candidates a key press</li>
+<li>Needs markdownweb v0.0.5 and cmarkfind v0.0.1 (a pure-Go SQLite
+driver comes with it; still no cgo)</li>
+<li>-help index lists eleven help topics; -help TOPIC shows one, and
+each is a section 7 man page (cmarkbrowser-TOPIC.7)</li>
+</ul>
 <h2 id="authors">Authors</h2>
 <ul>
 <li><a href="https://orcid.org/0000-0003-0900-6903">R. S. Doiel</a></li>
@@ -52,6 +63,9 @@ Tracker</a></li>
 <h2 id="software-requirements">Software Requirements</h2>
 <ul>
 <li>Go &gt;= 1.27.4</li>
+<li>github.com/rsdoiel/frontmatter &gt;= 0.0.1</li>
+<li>github.com/rsdoiel/markdownweb &gt;= 0.0.5</li>
+<li>github.com/rsdoiel/cmarkfind &gt;= 0.0.1</li>
 </ul>
 <h2 id="software-suggestions">Software Suggestions</h2>
 <ul>

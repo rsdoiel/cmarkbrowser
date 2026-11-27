@@ -10,7 +10,7 @@ authors:
 
 
 repository_code: https://github.com/rsdoiel/cmarkbrowser
-version: 0.0.3
+version: 0.0.4
 license_url: https://www.gnu.org/licenses/agpl-3.0.txt
 
 programming_language:
@@ -30,11 +30,12 @@ date_released: 2026-11-26
 About this software
 ===================
 
-## cmarkbrowser 0.0.3
+## cmarkbrowser 0.0.4
 
-- ] and [ follow BonBon's rule for a page that names no urlPrev and urlNext (markdownweb v0.0.4, DR-0004): the outline is one flat list, the line below is next and the line above previous, the ends wrap, groups do not stop the arrows, and a list with calendar outlines is no longer reversed. A site the outline includes is a list of its own. A neighbour with nothing at its address is not skipped yet.
-- markdownweb is v0.0.4: requests go through its polite fetcher, so the User-Agent is cmarkbrowser/VERSION, or the user-agent setting in ~/.config/cmarkbrowser/cmarkbrowser.yaml (a wrong file exits 78); new internal/config.
-- Front matter and {{page.NAME}} macros come from github.com/rsdoiel/frontmatter; goldmark is v1.8.7; Needs Go 1.27.4.
+- S searches a cmarkfind corpus (a SQLite3 FTS5 file) and shows the results as a page; F fills the corpus from the site being read, 25 pages a press; -corpus, -no-corpus, the corpus config key and CMARKFIND_DB name the file; -find QUERY prints the results for scripts (exit 0, 1 none, 66 no corpus, 65 not a corpus). Stored text is escaped so a result can make no link of its own (cmarkbrowser DR-0003)
+- ] and [ pass over a neighbour with nothing at its address, as BonBon does: each address asked once, at most 12 candidates a key press
+- Needs markdownweb v0.0.5 and cmarkfind v0.0.1 (a pure-Go SQLite driver comes with it; still no cgo)
+- -help index lists eleven help topics; -help TOPIC shows one, and each is a section 7 man page (cmarkbrowser-TOPIC.7)
 
 ## Authors
 
@@ -62,7 +63,8 @@ A terminal browser for the Markdown Web inspired by Dave Winer's BonBon: it fetc
 
 - Go >= 1.27.4
 - github.com/rsdoiel/frontmatter >= 0.0.1
-- github.com/rsdoiel/markdownweb >= 0.0.4
+- github.com/rsdoiel/markdownweb >= 0.0.5
+- github.com/rsdoiel/cmarkfind >= 0.0.1
 
 
 ## Software Suggestions

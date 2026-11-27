@@ -33,6 +33,7 @@ reference</h1>
 <p>cmarkbrowser [-history FILE | -no-history]</p>
 <p>cmarkbrowser -dump [-style NAME] [-width N] [-debug FILE]
 URL|PATH</p>
+<p>cmarkbrowser -find QUERY [-corpus FILE]</p>
 <h2 id="description">DESCRIPTION</h2>
 <p>cmarkbrowser fetches a page as Markdown, shows it in the terminal and
 follows its links. It is modelled on Dave Winer’s BonBon: HTML in a page
@@ -45,8 +46,11 @@ the next and previous page that the page names in its urlNext and
 urlPrev front matter, or, when it names none, that the site’s table of
 contents gives (the nearest .well-known/toc.opml above the page, with
 the outlines it includes; read the first time one of these keys needs
-it, and remembered); Esc clears a typed number, then the focus, then a
-search; arrows, PgUp, PgDn, space, g and G scroll; q quits.</p>
+it, and remembered). As in BonBon the outline is one list: ] is the line
+below the page, [ the line above, the ends wrap, and a site the outline
+includes is a list of its own; Esc clears a typed number, then the
+focus, then a search; arrows, PgUp, PgDn, space, g and G scroll; q
+quits.</p>
 <p>/ searches the page. Type a Go regular expression (the RE2 syntax of
 the regexp package) and press Enter: the page scrolls to the first match
 at or below the top of the window, every match is marked and the current
@@ -65,6 +69,18 @@ page, created with a “# Bookmarks” heading when it is missing and never
 rewritten, only added to. A page already in it is not added twice. Open
 it with B, or give it as the argument, and follow its links like any
 page; b comes back to it. Edit it by hand if you like.</p>
+<p>S searches a corpus of pages that cmarkfind keeps in one SQLite file:
+type a query at the bottom of the screen and press Enter (Esc cancels).
+The results are a page like any other, with numbered links, the matching
+text and a count (including how many pages the sites list that are not
+fetched yet); b comes back to it and runs the query again. The query is
+words, “phrases”, AND, OR, NOT and word*; anything else is searched as
+plain words. F fills the corpus from the site being read: one batch of
+25 pages of the table of contents that lists the page (a local site is
+filled whole); press F again for the next batch. Nothing is added to the
+corpus unless F is pressed. -corpus FILE names the file (default: the
+corpus key of the configuration file, then CMARKFIND_DB, then
+cmarkfind’s own default) and -no-corpus turns S and F off.</p>
 <p>o asks for an address to open, at the bottom of the screen: type it
 and press Enter (Esc cancels). An address starts with http:// or
 https://; a bare host name such as example.org/a.md gets https://. A
@@ -121,9 +137,10 @@ view: its text, links and pictures that have alt text, without scripts,
 styles or menus.</p>
 <h2 id="options">OPTIONS</h2>
 <dl>
-<dt>-h, -help</dt>
+<dt>-h, -help [TOPIC]</dt>
 <dd>
-Show this help.
+Show this help, or one topic’s page. -help index lists the topics. Each
+is also a manual page of section 7, cmarkbrowser-TOPIC(7).
 </dd>
 <dt>-l, -license</dt>
 <dd>
@@ -155,6 +172,22 @@ the working directory.
 <dd>
 Record no history. Cannot be combined with -history.
 </dd>
+<dt>-corpus FILE</dt>
+<dd>
+The cmarkfind corpus S searches and F fills. Cannot be combined with
+-no-corpus.
+</dd>
+<dt>-no-corpus</dt>
+<dd>
+Turn corpus search and fill off.
+</dd>
+<dt>-find QUERY</dt>
+<dd>
+Search the corpus and print the results page’s Markdown on standard
+output, with no URL and no browser. Exit 0 with matches, 1 with none, 66
+when there is no corpus, 65 when the file is not a corpus or has a newer
+schema.
+</dd>
 <dt>-debug FILE</dt>
 <dd>
 Append a log of the session to FILE, one JSON object per line: every key
@@ -170,11 +203,33 @@ page opened as it did, and to send a session to someone who can read it.
 Show the version.
 </dd>
 </dl>
+<h2 id="configuration">CONFIGURATION</h2>
+<p>If ~/.config/cmarkbrowser/cmarkbrowser.yaml exists ($XDG_CONFIG_HOME
+is used when set) it is read before anything is fetched. A missing file
+is fine; a file that is there and wrong is an error (exit 78). Settings
+so far:</p>
+<dl>
+<dt>user-agent</dt>
+<dd>
+The User-Agent sent with every request, so a site can tell who is
+asking. The default is cmarkbrowser/VERSION. Example:
+<pre><code>user-agent: cmarkbrowser/0.0.2 (+https://example.org/about)</code></pre>
+</dd>
+<dt>corpus</dt>
+<dd>
+The cmarkfind corpus file for S, F and -find. Example:
+<pre><code>corpus: ~/.local/share/cmarkfind/corpus.db</code></pre>
+</dd>
+</dl>
 <h2 id="exit-status">EXIT STATUS</h2>
 <dl>
 <dt>0</dt>
 <dd>
 Success.
+</dd>
+<dt>1</dt>
+<dd>
+-find matched nothing.
 </dd>
 <dt>2</dt>
 <dd>
@@ -183,12 +238,13 @@ Bad command line.
 <dt>65</dt>
 <dd>
 The page is not Markdown (and not HTML), its front matter is not valid,
-or the file named is not text.
+or the file named is not text; or the corpus is not a corpus or is newer
+than this program reads.
 </dd>
 <dt>66</dt>
 <dd>
-The page is not there (404 or 410), the path named does not exist, or
-the directory named has no index.md.
+The page is not there (404 or 410), the path named does not exist, the
+directory named has no index.md, or -find has no corpus to read.
 </dd>
 <dt>69</dt>
 <dd>
@@ -202,11 +258,26 @@ A bug.
 <dd>
 The -debug file cannot be created.
 </dd>
+<dt>75</dt>
+<dd>
+The corpus is locked by another program; try again.
+</dd>
 <dt>77</dt>
 <dd>
 The operating system refused access to the path named.
 </dd>
+<dt>78</dt>
+<dd>
+The configuration file is there and wrong.
+</dd>
 </dl>
+<h2 id="see-also">SEE ALSO</h2>
+<p>cmarkbrowser-reading(7), cmarkbrowser-neighbours(7),
+cmarkbrowser-search(7), cmarkbrowser-corpus(7),
+cmarkbrowser-bookmarks(7), cmarkbrowser-local(7),
+cmarkbrowser-editing(7), cmarkbrowser-files(7), cmarkbrowser-debug(7),
+cmarkbrowser-config(7), cmarkbrowser-exit-status(7)</p>
+<p>cmarkfind(1), BonBon (Dave Winer)</p>
 </section>
 <footer>
 <p>cmarkbrowser, a terminal browser for the Markdown web. This page is also published as <a href="command_reference.md">Markdown</a>.</p>

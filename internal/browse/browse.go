@@ -122,6 +122,34 @@ func Open(ctx context.Context, addr string, r render.Renderer, width int) (*View
 	return build(ctx, addr, p, nil, r, width, t0)
 }
 
+/** OpenMarkdown shows Markdown the browser made itself (a search results page)
+ * as a page at the given address. The text goes through the same expansion,
+ * clean-up and numbering as a fetched page.
+ *
+ * Parameters:
+ *   ctx (context.Context) — carries the debug logger
+ *   addr (string) — the address the page is shown at; not fetched
+ *   src (string) — the Markdown, with optional front matter
+ *   r (render.Renderer) — the renderer
+ *   width (int) — columns to wrap to
+ *
+ * Returns:
+ *   *View — the page ready to show
+ *   error — from the front matter, or the renderer
+ *
+ * Example:
+ *   v, err := browse.OpenMarkdown(ctx, "corpus:search?q=x", "# Results\n", render.Glamour{}, 80)
+ */
+func OpenMarkdown(ctx context.Context, addr, src string, r render.Renderer, width int) (*View, error) {
+	t0 := time.Now()
+	p, err := page.Parse([]byte(src))
+	if err != nil {
+		return nil, err
+	}
+	p.URL = addr
+	return build(ctx, addr, p, nil, r, width, t0)
+}
+
 /** OpenFile shows a local Markdown file the way Open shows a page. It is only
  * for a file the person named (the start argument, the bookmarks file); links
  * are never opened through it.

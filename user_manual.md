@@ -51,8 +51,10 @@ it includes from the same site. As in BonBon, the outline is read as one list,
 top to bottom, a page with outlines under it before them: `]` is the line below
 the page and `[` the line above. Groups do not stop the arrows and the ends
 wrap, from the last line to the first. A site the outline includes is a list of
-its own, so its last page wraps to its first. A site with no table of contents
-says so in the status line.
+its own, so its last page wraps to its first. A neighbour with nothing at its address
+(a non-2xx answer, or none) is passed over, as BonBon does: each address is asked
+about once, the answer is remembered, and at most 12 candidates are tried per key
+press. A site with no table of contents says so in the status line.
 
 ## Searching
 
@@ -60,6 +62,29 @@ Press `/`, type a regular expression and press Enter. Every match is marked and
 the page scrolls to the first one. `n` and `N` go to the next and previous match.
 A pattern with no capital letters ignores case. `/` then Enter repeats the last
 search.
+
+## Searching the sites you have read
+
+cmarkbrowser can search a corpus of pages that [cmarkfind](https://github.com/rsdoiel/cmarkfind)
+keeps in one SQLite file. Nothing is sent anywhere by a search.
+
+- `S` asks for a query at the bottom of the screen; Enter runs it, `Esc` cancels.
+  The query is words, "phrases", `AND`, `OR`, `NOT` and `word*`; anything else is
+  searched as plain words. The results are a page like any other: numbered links,
+  the matching text, and a count that says how many pages the sites list but have
+  not been fetched yet. `b` comes back to the results and runs the query again.
+- `F` fills the corpus from the site you are reading: one batch of 25 pages of the
+  table of contents that lists the page (a local site is filled whole). Press `F`
+  again for the next batch. Nothing is added to the corpus unless you press `F`.
+- `cmarkbrowser -find QUERY` prints the results page's Markdown on standard output,
+  with no browser, for scripts. It exits 0 with matches, 1 with none, 66 when there
+  is no corpus and 65 when the file is not a corpus or is newer than this program
+  reads.
+
+The corpus file is named by `-corpus FILE`, else the `corpus` key of the
+configuration file, else `CMARKFIND_DB`, else cmarkfind's own default. `-no-corpus`
+turns `S` and `F` off. Fill a big site, or keep one up to date, with the
+`cmarkfind` program.
 
 ## History and bookmarks
 
@@ -124,12 +149,14 @@ cmarkbrowser -dump -style notty https://rsdoiel.github.io/blog/index.md | less
 ## Configuration
 
 If `~/.config/cmarkbrowser/cmarkbrowser.yaml` exists (`$XDG_CONFIG_HOME` is used
-when set) cmarkbrowser reads it before it fetches anything. So far it holds one
-setting, the User-Agent sent with every request, `cmarkbrowser/VERSION` unless
-you name another:
+when set) cmarkbrowser reads it before it fetches anything. It holds two
+settings. `user-agent` is the User-Agent sent with every request,
+`cmarkbrowser/VERSION` unless you name another, and `corpus` is the cmarkfind
+corpus that `S` and `F` use:
 
 ~~~yaml
-user-agent: cmarkbrowser/0.0.2 (+https://example.org/about)
+user-agent: cmarkbrowser/0.0.4 (+https://example.org/about)
+corpus: ~/.local/share/cmarkfind/corpus.db
 ~~~
 
 ## Exit codes
@@ -138,8 +165,9 @@ user-agent: cmarkbrowser/0.0.2 (+https://example.org/about)
 |------|---------|
 | 0 | Success. |
 | 2 | Bad command line. |
-| 65 | The page is not text, or its front matter is not valid. |
-| 66 | The page, path or index.md is not there. |
+| 1 | `-find` found nothing. |
+| 65 | The page is not text, or its front matter is not valid; or the corpus is not a corpus or is newer than this program reads. |
+| 66 | The page, path or index.md is not there, or `-find` has no corpus to read. |
 | 69 | The server cannot be reached. |
 | 77 | The operating system refused access to the path. |
 | 78 | The configuration file is there and wrong. |

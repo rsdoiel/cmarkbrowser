@@ -36,7 +36,7 @@ func (m Model) canLookUpTOC() bool {
 // after (dir +1) the page being shown. The reading is done in the background
 // and the answer comes back as a tocMsg.
 func (m Model) lookupTOC(dir int) tea.Cmd {
-	page, finder, log, site := m.view.Page.URL, m.toc, m.log, m.view.Site
+	page, finder, probe, log, site := m.view.Page.URL, m.toc, m.probe, m.log, m.view.Site
 	return func() tea.Msg {
 		ctx, cancel := context.WithTimeout(debuglog.WithContext(context.Background(), log), tocTimeout)
 		defer cancel()
@@ -44,7 +44,16 @@ func (m Model) lookupTOC(dir int) tea.Cmd {
 			p, _ := local.PathOf(page)
 			return tocMsg{page: page, dir: dir, res: finder.LookupLocal(ctx, site.Root, p), local: true}
 		}
-		return tocMsg{page: page, dir: dir, res: finder.Lookup(ctx, page)}
+		res := finder.Lookup(ctx, page)
+		if res.Found && probe != nil {
+			// pass over a neighbour with nothing at its address (DR-0004 Q1)
+			if dir < 0 {
+				res.Prev = probe.firstThatAnswers(ctx, res.Before, page)
+			} else {
+				res.Next = probe.firstThatAnswers(ctx, res.After, page)
+			}
+		}
+		return tocMsg{page: page, dir: dir, res: res}
 	}
 }
 

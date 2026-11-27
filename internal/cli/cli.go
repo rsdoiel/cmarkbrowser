@@ -18,7 +18,9 @@ import (
 	"github.com/rsdoiel/cmarkbrowser/internal/browse"
 	"github.com/rsdoiel/cmarkbrowser/internal/config"
 	"github.com/rsdoiel/cmarkbrowser/internal/render"
+	"github.com/rsdoiel/cmarkbrowser/internal/results"
 	"github.com/rsdoiel/cmarkbrowser/internal/ui"
+	"github.com/rsdoiel/cmarkfind/corpus"
 	"github.com/rsdoiel/markdownweb/debuglog"
 	"github.com/rsdoiel/markdownweb/fetch"
 	"github.com/rsdoiel/markdownweb/page"
@@ -45,8 +47,8 @@ const defaultHistory = "history.md"
  *   code := cli.Run([]string{"-version"}, os.Stdout, os.Stderr) // 0
  */
 func Run(args []string, stdout, stderr io.Writer) int {
-	var showHelp, showLicense, showVersion, dump, noHistory bool
-	var style, debugPath, bookmarksPath, historyPath string
+	var showHelp, showLicense, showVersion, dump, noHistory, noCorpus bool
+	var style, debugPath, bookmarksPath, historyPath, corpusFlag, find string
 	var width int
 	fs := flag.NewFlagSet(appName, flag.ContinueOnError)
 	fs.SetOutput(io.Discard)
@@ -63,10 +65,20 @@ func Run(args []string, stdout, stderr io.Writer) int {
 	fs.StringVar(&bookmarksPath, "bookmarks", "", "the Markdown file m adds to and B opens (default bookmarks.md)")
 	fs.StringVar(&historyPath, "history", "", "the Markdown file that visited pages are recorded in, newest first; H opens it (default history.md)")
 	fs.BoolVar(&noHistory, "no-history", false, "record no history")
+	fs.StringVar(&corpusFlag, "corpus", "", "the cmarkfind corpus file S, F and -find use")
+	fs.BoolVar(&noCorpus, "no-corpus", false, "turn corpus search and fill off")
+	fs.StringVar(&find, "find", "", "search the corpus for QUERY and print the results page")
 	if err := fs.Parse(args); err != nil {
 		return fail(stderr, fmt.Errorf("%w: %s", ErrUsage, err))
 	}
 	switch {
+	case showHelp && fs.NArg() > 1:
+		return fail(stderr, fmt.Errorf("%w: -help takes one topic (cmarkbrowser -help index lists them)", ErrUsage))
+	case showHelp && fs.NArg() == 1:
+		if err := helpTopic(stdout, fs.Arg(0)); err != nil {
+			return fail(stderr, err)
+		}
+		return ExitOK
 	case showHelp:
 		fmt.Fprint(stdout, cmarkbrowser.FmtHelp(HelpText, appName, cmarkbrowser.Version, cmarkbrowser.ReleaseDate, cmarkbrowser.ReleaseHash))
 		return ExitOK
@@ -80,6 +92,14 @@ func Run(args []string, stdout, stderr io.Writer) int {
 	if fs.NArg() > 1 {
 		return fail(stderr, fmt.Errorf("%w: at most one URL, got %d arguments", ErrUsage, fs.NArg()))
 	}
+	findGiven := false
+	fs.Visit(func(f *flag.Flag) { findGiven = findGiven || f.Name == "find" })
+	switch {
+	case noCorpus && corpusFlag != "":
+		return fail(stderr, fmt.Errorf("%w: -corpus and -no-corpus together", ErrUsage))
+	case findGiven && (fs.NArg() != 0 || dump || noCorpus || strings.TrimSpace(find) == ""):
+		return fail(stderr, fmt.Errorf("%w: -find takes a query and nothing else (no URL, -dump or -no-corpus)", ErrUsage))
+	}
 	if dump && fs.NArg() != 1 {
 		return fail(stderr, fmt.Errorf("%w: -dump needs one URL", ErrUsage))
 	}
@@ -91,13 +111,13 @@ func Run(args []string, stdout, stderr io.Writer) int {
 	if historyPath == "" && !noHistory {
 		historyPath = defaultHistory
 	}
-	if noHistory || dump {
+	if noHistory || dump || findGiven {
 		historyPath = ""
 	}
 	// With no URL the browser starts from the history file, when there is one.
 	start := fs.Arg(0)
 	fromHistory := false
-	if !dump && fs.NArg() == 0 {
+	if !dump && !findGiven && fs.NArg() == 0 {
 		if historyPath == "" {
 			return fail(stderr, fmt.Errorf("%w: a URL is needed (try -help)", ErrUsage))
 		}
@@ -106,7 +126,7 @@ func Run(args []string, stdout, stderr io.Writer) int {
 		}
 		start, fromHistory = historyPath, true
 	}
-	if !dump && !isTerminal(stdout) {
+	if !dump && !findGiven && !isTerminal(stdout) {
 		return fail(stderr, fmt.Errorf("%w: the browser needs a terminal; use -dump to print a page", ErrUsage))
 	}
 	// The configuration is read before anything is fetched: a file that is
@@ -114,6 +134,9 @@ func Run(args []string, stdout, stderr io.Writer) int {
 	cfg, err := config.Load()
 	if err != nil {
 		return fail(stderr, err)
+	}
+	if findGiven {
+		return runFind(context.Background(), corpusPath(corpusFlag, false, cfg), find, stdout, stderr)
 	}
 	userAgent := cfg.UserAgent
 	if userAgent == "" {
@@ -162,6 +185,9 @@ func Run(args []string, stdout, stderr io.Writer) int {
 		code = runDump(ctx, start, site, render.Glamour{Style: style}, width, stdout, stderr)
 	} else {
 		model := ui.New(start, render.Glamour{Style: style}).WithDebug(log).WithBookmarks(bookmarksPath).WithHistory(historyPath)
+		if cp := corpusPath(corpusFlag, noCorpus, cfg); cp != "" {
+			model = model.WithCorpus(cp, userAgent)
+		}
 		if isPath {
 			model = model.WithLocalStart()
 			if site != nil {
@@ -227,4 +253,53 @@ func isTerminal(w io.Writer) bool {
 func fail(stderr io.Writer, err error) int {
 	fmt.Fprintf(stderr, "%s: %s\n", appName, err)
 	return ExitCode(err)
+}
+
+/** corpusPath says which corpus file the browser uses: -corpus, else the
+ * configuration file's corpus, else CMARKFIND_DB, else cmarkfind's default;
+ * "" when -no-corpus turns it off.
+ *
+ * Parameters:
+ *   flagValue (string) — the -corpus option
+ *   off (bool)         — -no-corpus
+ *   cfg (config.Config) — the configuration file
+ *
+ * Returns:
+ *   string — the file, or "" for none
+ *
+ * Example:
+ *   p := corpusPath("", false, config.Config{}) // cmarkfind's default
+ */
+func corpusPath(flagValue string, off bool, cfg config.Config) string {
+	switch {
+	case off:
+		return ""
+	case flagValue != "":
+		return flagValue
+	case cfg.Corpus != "":
+		return cfg.Corpus
+	}
+	return corpus.PathFromEnv()
+}
+
+// runFind prints the results page of a corpus search (cmarkbrowser DR-0003 6):
+// exit 0 with hits, 1 with none.
+func runFind(ctx context.Context, path, query string, stdout, stderr io.Writer) int {
+	if _, err := os.Stat(path); err != nil {
+		return fail(stderr, fmt.Errorf("%w: no corpus at %s (cmarkfind fill SITE makes one)", page.ErrNoInput, path))
+	}
+	db, err := corpus.Open(path)
+	if err != nil {
+		return fail(stderr, err)
+	}
+	defer db.Close()
+	res, err := db.Search(ctx, strings.TrimSpace(query), 50)
+	if err != nil {
+		return fail(stderr, err)
+	}
+	fmt.Fprint(stdout, results.Page(strings.TrimSpace(query), res))
+	if len(res.Hits) == 0 {
+		return ExitNegative
+	}
+	return ExitOK
 }

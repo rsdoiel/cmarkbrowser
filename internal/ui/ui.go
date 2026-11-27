@@ -71,7 +71,17 @@ type Model struct {
 	marked      *search.Marked // the page with the matches marked, for the focus in markedFocus
 	markedFocus int
 
-	toc *toc.Finder // the site's table of contents, read when ] or [ needs it
+	toc   *toc.Finder // the site's table of contents, read when ] or [ needs it
+	probe *prober     // which neighbours answer, so ] and [ pass over dead ones
+
+	// the corpus (cmarkbrowser DR-0003): search with S, fill with F
+	corpusPath string        // "" when search is off (-no-corpus)
+	corpusUA   string        // the User-Agent a fill sends
+	fillBatch  int           // pages one F asks about
+	fillPause  time.Duration // between requests of a fill
+	findPrompt bool          // a query is being typed
+	find       string
+	filling    bool // a fill is running
 
 	// an address being typed (o), and the history file (H)
 	addrPrompt bool
@@ -101,7 +111,7 @@ type Model struct {
  *   m := ui.New("https://x.org/a.md", render.Glamour{Style: "dark"})
  */
 func New(start string, r render.Renderer) Model {
-	return Model{r: r, start: start, idx: -1, w: 80, h: 24, localOK: map[string]bool{}, rooted: map[string]bool{}, toc: toc.NewFinder(), vp: viewport.New(viewport.WithWidth(80), viewport.WithHeight(22))}
+	return Model{r: r, start: start, idx: -1, w: 80, h: 24, localOK: map[string]bool{}, rooted: map[string]bool{}, toc: toc.NewFinder(), probe: newProber(), vp: viewport.New(viewport.WithWidth(80), viewport.WithHeight(22))}
 }
 
 /** WithDebug returns the browser with a debug logger: every key, load, status
@@ -146,6 +156,9 @@ func (m Model) Init() tea.Cmd {
 // entry; why says what asked for it (start, link, history, next, prev) for the
 // debug log.
 func (m Model) load(addr string, idx int, why string) tea.Cmd {
+	if isCorpusAddr(addr) {
+		return m.searchPage(addr, idx)
+	}
 	if isFileAddr(addr) {
 		return m.openFileAddr(addr, idx, why)
 	}
@@ -220,6 +233,8 @@ func (m Model) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.editDone(msg)
 	case tocMsg:
 		return m.tocAnswered(msg)
+	case fillMsg:
+		return m.fillDone(msg), nil
 	case tea.KeyPressMsg:
 		return m.key(msg)
 	}
@@ -277,6 +292,9 @@ func (m Model) loaded(msg loadMsg) Model {
 
 // key handles one key press.
 func (m Model) key(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
+	if m.findPrompt {
+		return m.findKey(msg)
+	}
 	if m.addrPrompt {
 		return m.addrKey(msg)
 	}
@@ -305,6 +323,10 @@ func (m Model) key(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		}
 		m.num, m.status = "", ""
 		return m, nil
+	case s == "S" && m.num == "":
+		return m.openFindPrompt(), nil
+	case s == "F" && m.num == "":
+		return m.startFill()
 	case s == "m" && m.num == "":
 		return m.mark(), nil
 	case s == "e" && m.num == "":
@@ -539,11 +561,16 @@ func (m Model) View() tea.View {
 			foot += "  ] next"
 		}
 	}
+	if m.corpusPath != "" {
+		foot += "  S find  F fill"
+	}
 	foot += "  q quit"
 	if len(m.matches) > 0 {
 		foot = fmt.Sprintf("/%s  %d of %d  n next  N prev  Esc clear", m.pattern, m.cur+1, len(m.matches))
 	}
 	switch {
+	case m.findPrompt:
+		foot = "search corpus: " + m.find + "▏"
 	case m.addrPrompt:
 		foot = "open: " + m.addr + "▏"
 	case m.prompt:
@@ -560,7 +587,7 @@ func (m Model) View() tea.View {
 			}
 		}
 	}
-	if m.view != nil && m.status == "" && m.num == "" && !m.prompt && !m.addrPrompt {
+	if m.view != nil && m.status == "" && m.num == "" && !m.prompt && !m.addrPrompt && !m.findPrompt {
 		foot = fmt.Sprintf("%3.0f%%  %s", m.vp.ScrollPercent()*100, foot)
 	}
 	v := tea.NewView(clip(title, m.w) + "\n" + m.vp.View() + "\n" + clip(foot, m.w))

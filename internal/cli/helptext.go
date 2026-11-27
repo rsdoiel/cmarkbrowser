@@ -23,6 +23,8 @@ const HelpText = `%{app_name}(1) user manual | version {version} {release_hash}
 
 {app_name} -dump [-style NAME] [-width N] [-debug FILE] URL|PATH
 
+{app_name} -find QUERY [-corpus FILE]
+
 # DESCRIPTION
 
 {app_name} fetches a page as Markdown, shows it in the terminal and follows
@@ -60,6 +62,18 @@ ordinary Markdown (bookmarks.md in the working directory, or the file named by
 page already in it is not added twice. Open it with B, or give it as the
 argument, and follow its links like any page; b comes back to it. Edit it by
 hand if you like.
+
+S searches a corpus of pages that cmarkfind keeps in one SQLite file: type a
+query at the bottom of the screen and press Enter (Esc cancels). The results
+are a page like any other, with numbered links, the matching text and a count
+(including how many pages the sites list that are not fetched yet); b comes
+back to it and runs the query again. The query is words, "phrases", AND, OR,
+NOT and word*; anything else is searched as plain words. F fills the corpus from
+the site being read: one batch of 25 pages of the table of contents that lists
+the page (a local site is filled whole); press F again for the next batch.
+Nothing is added to the corpus unless F is pressed. -corpus FILE names the
+file (default: the corpus key of the configuration file, then CMARKFIND_DB,
+then cmarkfind's own default) and -no-corpus turns S and F off.
 
 o asks for an address to open, at the bottom of the screen: type it and press
 Enter (Esc cancels). An address starts with http:// or https://; a bare host
@@ -116,8 +130,9 @@ text, links and pictures that have alt text, without scripts, styles or menus.
 
 # OPTIONS
 
--h, -help
-: Show this help.
+-h, -help [TOPIC]
+: Show this help, or one topic's page. -help index lists the topics. Each is
+  also a manual page of section 7, {app_name}-TOPIC(7).
 
 -l, -license
 : Show the license.
@@ -141,6 +156,17 @@ text, links and pictures that have alt text, without scripts, styles or menus.
 
 -no-history
 : Record no history. Cannot be combined with -history.
+
+-corpus FILE
+: The cmarkfind corpus S searches and F fills. Cannot be combined with -no-corpus.
+
+-no-corpus
+: Turn corpus search and fill off.
+
+-find QUERY
+: Search the corpus and print the results page's Markdown on standard output,
+  with no URL and no browser. Exit 0 with matches, 1 with none, 66 when there is
+  no corpus, 65 when the file is not a corpus or has a newer schema.
 
 -debug FILE
 : Append a log of the session to FILE, one JSON object per line: every key
@@ -166,21 +192,30 @@ user-agent
 
       user-agent: cmarkbrowser/0.0.2 (+https://example.org/about)
 
+corpus
+: The cmarkfind corpus file for S, F and -find. Example:
+
+      corpus: ~/.local/share/cmarkfind/corpus.db
+
 # EXIT STATUS
 
 0
 : Success.
+
+1
+: -find matched nothing.
 
 2
 : Bad command line.
 
 65
 : The page is not Markdown (and not HTML), its front matter is not valid, or
-  the file named is not text.
+  the file named is not text; or the corpus is not a corpus or is newer than
+  this program reads.
 
 66
-: The page is not there (404 or 410), the path named does not exist, or the
-  directory named has no index.md.
+: The page is not there (404 or 410), the path named does not exist, the
+  directory named has no index.md, or -find has no corpus to read.
 
 69
 : The server cannot be reached.
@@ -191,9 +226,21 @@ user-agent
 73
 : The -debug file cannot be created.
 
+75
+: The corpus is locked by another program; try again.
+
 77
 : The operating system refused access to the path named.
 
 78
 : The configuration file is there and wrong.
+
+# SEE ALSO
+
+{app_name}-reading(7), {app_name}-neighbours(7), {app_name}-search(7),
+{app_name}-corpus(7), {app_name}-bookmarks(7), {app_name}-local(7),
+{app_name}-editing(7), {app_name}-files(7), {app_name}-debug(7),
+{app_name}-config(7), {app_name}-exit-status(7)
+
+cmarkfind(1), BonBon (Dave Winer)
 `

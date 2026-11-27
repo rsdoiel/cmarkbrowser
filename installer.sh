@@ -1,11 +1,11 @@
 #!/bin/sh
-# generated with CMTools 0.0.3 6b4cef3
+# generated with CMTools 0.0.4 d68dce9
 
 #
 # Set the package name and version to install
 #
 PACKAGE="cmarkbrowser"
-VERSION="0.0.3"
+VERSION="0.0.4"
 GIT_GROUP="rsdoiel"
 RELEASE="https://github.com/$GIT_GROUP/$PACKAGE/releases/tag/v$VERSION"
 if [ "$PKG_VERSION" != "" ]; then

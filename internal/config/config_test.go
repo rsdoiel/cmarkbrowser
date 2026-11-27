@@ -111,3 +111,14 @@ func TestUnreadableFileIsErrConfig(t *testing.T) {
 		t.Fatalf("err %v", err)
 	}
 }
+
+func TestReadsCorpus(t *testing.T) {
+	dir := t.TempDir()
+	t.Setenv("XDG_CONFIG_HOME", dir)
+	os.MkdirAll(filepath.Join(dir, "cmarkbrowser"), 0o755)
+	os.WriteFile(filepath.Join(dir, "cmarkbrowser", FileName), []byte("corpus: /data/c.db\n"), 0o644)
+	c, err := Load()
+	if err != nil || c.Corpus != "/data/c.db" {
+		t.Errorf("%+v %v", c, err)
+	}
+}

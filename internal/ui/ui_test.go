@@ -25,6 +25,7 @@ func site(t *testing.T) *httptest.Server {
 		"/a.md":      "---\ntitle: Page A\n---\n# Alpha\n\nGo to [b](b.md) or [c](c.md).\n",
 		"/b.md":      "---\ntitle: Page B\n---\n# Beta\n\n[home](a.md)\n",
 		"/c.md":      "# Gamma\n",
+		"/long.md":   "# Long\n\n[to target](long.md#the-target)\n\n" + strings.Repeat("filler line\n\n", 60) + "## The Target\n\nhere\n",
 		"/search.md": searchPageText(),
 		"/s/1.md":    "---\ntitle: One\nurlNext: 2.md\n---\n# Story One\n",
 		"/s/2.md":    "---\ntitle: Two\nurlPrev: 1.md\nurlNext: /c.md\n---\n# Story Two\n",
@@ -1486,5 +1487,24 @@ func TestAProbeAnswerIsRemembered(t *testing.T) {
 		if n := hits("GET", p) + hits("HEAD", p); n != 1 {
 			t.Errorf("%s was asked about %d times, once is enough", p, n)
 		}
+	}
+}
+
+func TestFollowFragmentScrollsToHeading(t *testing.T) {
+	srv := site(t)
+	m := New(srv.URL+"/long.md", render.Glamour{Style: "notty"})
+	m = drive(t, m, m.Init())
+	next, _ := m.Update(tea.WindowSizeMsg{Width: 80, Height: 24})
+	m = next.(Model)
+	if m.vp.YOffset() != 0 {
+		t.Fatalf("starts at %d", m.vp.YOffset())
+	}
+	m = press(t, m, "1", "enter")
+	if m.vp.YOffset() == 0 {
+		t.Fatal("did not scroll to the fragment")
+	}
+	line, ok := m.view.LineOfFragment("the-target")
+	if !ok || line < m.vp.YOffset() || line >= m.vp.YOffset()+m.vp.Height() {
+		t.Errorf("heading line %d (ok=%v) not in view at offset %d", line, ok, m.vp.YOffset())
 	}
 }

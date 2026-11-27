@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"github.com/rsdoiel/markdownweb/local"
 	"github.com/rsdoiel/markdownweb/page"
+	"net/url"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -287,6 +288,13 @@ func (m Model) loaded(msg loadMsg) Model {
 		m.vp.SetYOffset(m.restoreOffset) // back where the edit began, clamped to the new length
 	}
 	m.restoreAddr = ""
+	if msg.idx < 0 { // a link to page#heading opens with the heading near the top
+		if u, err := url.Parse(msg.addr); err == nil && u.Fragment != "" {
+			if line, ok := msg.v.LineOfFragment(u.Fragment); ok {
+				m.vp.SetYOffset(line)
+			}
+		}
+	}
 	return m.record()
 }
 

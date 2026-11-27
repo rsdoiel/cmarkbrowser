@@ -472,3 +472,25 @@ func TestAnUnclosedBlockIsShownAsTextAndNoted(t *testing.T) {
 		t.Errorf("Notes = %v", v.Notes)
 	}
 }
+
+func TestFragmentLines(t *testing.T) {
+	src := "# Top\n\nintro\n\n## Soil & Seeds\n\ntext\n\n## Notes\n\none\n\n## Notes\n\ntwo\n\n```\n# not a heading\n```\n\n### The *big* [idea](x.md)\n"
+	v, err := OpenMarkdown(context.Background(), "https://x.org/g.md", src, render.Glamour{Style: "notty"}, 60)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var prev = -1
+	for _, f := range []string{"top", "soil--seeds", "notes", "notes-1", "the-big-idea"} {
+		l, ok := v.LineOfFragment(f)
+		if !ok || l <= prev {
+			t.Fatalf("%q: line %d ok=%v after %d", f, l, ok, prev)
+		}
+		prev = l
+	}
+	if _, ok := v.LineOfFragment("not-a-heading"); ok {
+		t.Error("a heading inside a code fence was indexed")
+	}
+	if _, ok := v.LineOfFragment("nope"); ok {
+		t.Error("found a fragment that is not there")
+	}
+}

@@ -61,8 +61,9 @@ type View struct {
 	Notes   []string
 	Site    *local.Site
 
-	lines map[int]int // link number -> line of its marker in Text
-	log   *debuglog.Logger
+	lines   map[int]int // link number -> line of its marker in Text
+	anchors []anchor    // headings: slug and line in Text
+	log     *debuglog.Logger
 }
 
 /** Resolve resolves a link destination against the address of the page it is on.
@@ -312,6 +313,7 @@ var markerRE = regexp.MustCompile(render.Sentinel + `((?:\x1b\[[0-9;]*m)*)\[(\d+
 
 // index finds the line of each link marker in Text.
 func (v *View) index() {
+	v.anchors = findAnchors(v.Clean, v.Text)
 	v.lines = map[int]int{}
 	for i, line := range strings.Split(v.Text, "\n") {
 		for _, m := range markerRE.FindAllStringSubmatch(line, -1) {

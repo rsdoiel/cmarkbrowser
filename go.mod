@@ -8,7 +8,7 @@ require (
 	charm.land/glamour/v2 v2.0.1
 	github.com/rsdoiel/cmarkfind v0.0.2-0.20261127192720-31e91c650dfa
 	github.com/rsdoiel/frontmatter v0.0.1
-	github.com/rsdoiel/markdownweb v0.0.5
+	github.com/rsdoiel/markdownweb v0.0.6-0.20261127212007-3ec0cd8a5c56
 	github.com/yuin/goldmark v1.8.7
 	golang.org/x/term v0.43.0
 	gopkg.in/yaml.v3 v3.0.1

@@ -4,6 +4,10 @@ v0.0.0 is the prototype, a proof of concept: it shows that a terminal browser
 can read the Markdown web and preview a Markdown site. From v0.0.1, if the work
 continues, the development status becomes WIP.
 
+## Unreleased
+
+- A link to `page#heading` opens the page with that heading at the top. The heading's fragment is its slug by markdownweb's `slug` package (GitHub's rule, repeats numbered `-1`, `-2`). Links to a heading that is not found open at the top, as before.
+
 ## v0.0.4, 2026-11-26
 
 - **Corpus search and fill** (cmarkbrowser DR-0003, with cmarkfind): `S` asks for a query and shows the results of a cmarkfind corpus as a page (numbered links, matching text, how many listed pages are not fetched yet; `b` runs the query again). `F` fills the corpus from the site being read, one batch of 25 pages per press (a local site whole); nothing is added unless `F` is pressed. `-corpus FILE`, the `corpus` key and `CMARKFIND_DB` name the file, cmarkfind's default otherwise; `-no-corpus` turns it off. `-find QUERY` prints the results page for scripts (exit 0 matches, 1 none, 66 no corpus, 65 not a corpus). Stored text is escaped so a result can make no link of its own. This adds cmarkfind v0.0.1 (and its pure-Go SQLite driver, no cgo) as a dependency.

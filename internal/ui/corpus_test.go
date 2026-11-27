@@ -201,8 +201,13 @@ func TestAHostileSnippetMakesNoLinkImageHeadingOrHTML(t *testing.T) {
 	if strings.Contains(out, `\'`) || strings.Contains(out, `\,`) || strings.Contains(out, `\"`) {
 		t.Errorf("a backslash leaked into the text:\n%s", out)
 	}
-	if !strings.Contains(out, "evil.example") {
+	// the index shows a page's words, not its source: an address is its words
+	// ("evil example"), still text and never a link
+	if !strings.Contains(out, "evil example") {
 		t.Errorf("the text should still be shown, as text:\n%s", out)
+	}
+	if strings.Contains(out, "<script>") || strings.Contains(out, "](") {
+		t.Errorf("markup reached the snippet:\n%s", out)
 	}
 }
 

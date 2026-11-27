@@ -1,4 +1,4 @@
-%cmarkbrowser-neighbours(7) user manual | version 0.0.4 d68dce9
+%cmarkbrowser-neighbours(7) user manual | version 0.0.4 e22c5d6
 % R. S. Doiel
 % 2026-11-26
 

@@ -125,7 +125,7 @@ func TestAHostileFacetLabelOrValueMakesNoLinkImageHeadingOrHTML(t *testing.T) {
 	if n := strings.Count(md, "]("); n != 2 {
 		t.Errorf("%d links, want 2 (the value and the hit):\n%s", n, md)
 	}
-	if strings.Contains(md, "://") && strings.Count(md, "://") != strings.Count(md, ":\u200b//")+1 {
+	if strings.Count(md, "://") != 1 {
 		// the hit's own address is the one unbroken ://
 		t.Errorf("an unescaped address in stored text:\n%s", md)
 	}

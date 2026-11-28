@@ -9,6 +9,7 @@ continues, the development status becomes WIP.
 - A link to `page#heading` opens the page with that heading at the top. The heading's fragment is its slug by markdownweb's `slug` package (GitHub's rule, repeats numbered `-1`, `-2`). Links to a heading that is not found open at the top, as before.
 - The heading a fragment names is found more reliably: a one-line heading must match the whole rendered line, so a body line that only starts with the same words no longer wins; Setext headings (an `===` or `---` underline) count as headings and take part in the `-1`, `-2` numbering of repeats; `_emphasis_` and `__strong__` in a heading are ignored when slugging, as GitHub does, while `snake_case` keeps its underscore. A Setext heading that spans several lines is still not recognised.
 - markdownweb is pinned at v0.0.6.
+- **Facets in search results:** when a set defines facets (`cmarkfind set fields`), the results page lists them under Facets before the Results list, each value a link such as `go (23)`. Following one runs the query narrowed to that value, with its own facets; `b` returns to the page it came from. Facet links take the first link numbers, so the first hit's number follows them. A set with no facets shows the page as before. `-find` prints the same page. cmarkfind is pinned at a development commit until its release.
 
 ## v0.0.4, 2026-11-26
 

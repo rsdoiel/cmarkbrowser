@@ -5,6 +5,7 @@ package results
 import (
 	"encoding/json"
 	"fmt"
+	"net/url"
 	"strings"
 
 	"github.com/rsdoiel/cmarkfind/corpus"
@@ -37,18 +38,64 @@ func Page(q string, res *corpus.Results) string {
 		counts += fmt.Sprintf("; %d listed %s not fetched yet", res.Pending, plural(res.Pending, "page", "pages"))
 	}
 	fmt.Fprintf(&b, "%s.\n\n", counts)
+	facets := usableFacets(res.Facets)
+	hitIndent := ""
+	if len(facets) > 0 {
+		writeFacets(&b, facets)
+		b.WriteString("- Results\n")
+		hitIndent = "  "
+	}
 	for i, h := range res.Hits {
 		t := oneLine(h.Title)
 		if t == "" {
 			t = oneLine(h.Address)
 		}
-		fmt.Fprintf(&b, "%d. [%s](%s) — %s\n", i+1, esc(t), destination(h.Address), esc(h.Tier))
+		fmt.Fprintf(&b, "%s%d. [%s](%s) — %s\n", hitIndent, i+1, esc(t), destination(h.Address), esc(h.Tier))
 		if sn := oneLine(h.Snippet); sn != "" {
-			fmt.Fprintf(&b, "   %s\n", esc(sn))
+			fmt.Fprintf(&b, "%s   %s\n", hitIndent, esc(sn))
 		}
+		if hitIndent == "" {
+			b.WriteString("\n")
+		}
+	}
+	if hitIndent != "" {
 		b.WriteString("\n")
 	}
 	return b.String()
+}
+
+// searchScheme starts the address of a results page (cmarkbrowser DR-0003 4);
+// a facet link is one of these (DR-0004 2).
+const searchScheme = "corpus:search?q="
+
+// usableFacets drops the facets that have no values to follow.
+func usableFacets(in []corpus.FacetField) []corpus.FacetField {
+	var out []corpus.FacetField
+	for _, f := range in {
+		if len(f.Values) > 0 {
+			out = append(out, f)
+		}
+	}
+	return out
+}
+
+// writeFacets writes the Facets list: each facet's label, and under it a link
+// per value that runs the value's query as a search of its own. The label and
+// the values are stored text and are escaped like a title (DR-0004 3); the
+// destination is built here, since cmarkfind's relative ?q= names no search
+// against a corpus: address.
+func writeFacets(b *strings.Builder, facets []corpus.FacetField) {
+	b.WriteString("- Facets\n")
+	for _, f := range facets {
+		label := oneLine(f.Label)
+		if label == "" {
+			label = oneLine(f.Field)
+		}
+		fmt.Fprintf(b, "  - %s\n", esc(label))
+		for _, v := range f.Values {
+			fmt.Fprintf(b, "    - [%s (%d)](%s)\n", esc(oneLine(v.Value)), v.Count, searchScheme+url.QueryEscape(v.Query))
+		}
+	}
 }
 
 func plural(n int, one, many string) string {

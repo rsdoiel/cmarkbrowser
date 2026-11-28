@@ -116,6 +116,15 @@ a page like any other, with numbered links, the matching text and a count
 to it and runs the query again. The query is words, "phrases", AND, OR, NOT and
 word*; anything else is searched as plain words.
 
+When the set a result comes from has facets (the cmarkfind program defines them
+with set fields), the results page lists them first, under Facets: each facet's
+label, and under it its values with how many of the result's pages have each,
+such as go (23). The hits follow under Results, numbered as before. A facet's
+value is a link, and the links take the first numbers. Following one runs the
+same query narrowed to that value, a results page with facets of its own, so
+you can narrow again; b comes back to the page you left and runs its query
+again. A set with no facets shows only the hits. -find prints the same page.
+
 F fills the corpus from the site being read: one batch of 25 pages of the table
 of contents that lists the page (a local site is filled whole). Press F again
 for the next batch. Nothing is added to the corpus unless F is pressed. To keep a

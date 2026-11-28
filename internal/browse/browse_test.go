@@ -494,3 +494,67 @@ func TestFragmentLines(t *testing.T) {
 		t.Error("found a fragment that is not there")
 	}
 }
+
+// fragmentLine opens src and returns the rendered line a fragment lands on.
+func fragmentLine(t *testing.T, src, fragment string) string {
+	t.Helper()
+	v, err := OpenMarkdown(context.Background(), "https://x.org/g.md", src, render.Glamour{Style: "notty"}, 60)
+	if err != nil {
+		t.Fatal(err)
+	}
+	l, ok := v.LineOfFragment(fragment)
+	if !ok {
+		t.Fatalf("%q: no line found\n%s", fragment, v.Text)
+	}
+	return strings.Split(v.Text, "\n")[l]
+}
+
+func TestFragmentIsNotFooledByABodyLineThatStartsLikeTheHeading(t *testing.T) {
+	src := "# Top\n\nNotes are kept here.\n\n## Notes\n\nbody\n"
+	if got := fragmentLine(t, src, "notes"); !strings.Contains(got, "## Notes") {
+		t.Errorf("landed on %q", got)
+	}
+}
+
+func TestFragmentFindsSetextHeadings(t *testing.T) {
+	src := "# Top\n\nintro\n\nSetext Head\n-----------\n\ntext\n\nTitle Two\n=========\n\nmore\n"
+	for f, want := range map[string]string{"setext-head": "Setext Head", "title-two": "Title Two"} {
+		if got := fragmentLine(t, src, f); !strings.Contains(got, want) {
+			t.Errorf("%s landed on %q", f, got)
+		}
+	}
+}
+
+func TestSetextHeadingsCountForRepeatedSlugs(t *testing.T) {
+	src := "## Notes\n\none\n\nNotes\n-----\n\ntwo\n\n## Notes\n\nthree\n"
+	v, err := OpenMarkdown(context.Background(), "https://x.org/g.md", src, render.Glamour{Style: "notty"}, 60)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, f := range []string{"notes", "notes-1", "notes-2"} {
+		if _, ok := v.LineOfFragment(f); !ok {
+			t.Errorf("%q not found", f)
+		}
+	}
+}
+
+func TestATableRuleOrListIsNotASetextUnderline(t *testing.T) {
+	src := "# Top\n\n| a | b |\n|---|---|\n| 1 | 2 |\n\n- item\n- item\n\nintro\n\n---\n\n## Real\n"
+	v, err := OpenMarkdown(context.Background(), "https://x.org/g.md", src, render.Glamour{Style: "notty"}, 60)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if n := len(v.anchors); n != 2 {
+		t.Errorf("anchors %+v, want top and real only", v.anchors)
+	}
+}
+
+func TestFragmentIgnoresUnderscoreEmphasisInAHeading(t *testing.T) {
+	src := "# Top\n\n## _Under_ score\n\ntext\n\n## __init__ and snake_case\n"
+	if got := fragmentLine(t, src, "under-score"); !strings.Contains(got, "Under* score") {
+		t.Errorf("landed on %q", got)
+	}
+	if got := fragmentLine(t, src, "init-and-snake_case"); !strings.Contains(got, "init** and snake_case") {
+		t.Errorf("landed on %q", got)
+	}
+}

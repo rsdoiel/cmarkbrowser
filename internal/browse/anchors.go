@@ -14,6 +14,16 @@ var (
 	fenceRE    = regexp.MustCompile("^ {0,3}(```|~~~)")
 	markerStrp = regexp.MustCompile(`\s*\x{2060}\\\[\d+\\\]`) // the link marker Prepare adds
 	markupStrp = strings.NewReplacer("*", "", "`", "", "\u2060", "")
+
+	// setextRE is the underline of a Setext heading; a lone `---` after a
+	// paragraph line is one too, as in CommonMark.
+	setextRE = regexp.MustCompile(`^ {0,3}(?:=+|-+)[ \t]*$`)
+	// notParaRE starts a line that cannot be a one-line paragraph: a quote,
+	// list item, table row, ATX heading or indented code.
+	notParaRE = regexp.MustCompile(`^(?: {4}|\t|\s*(?:>|[-*+][ \t]|\d+[.)][ \t]|\||#))`)
+	// emphRE is `_emphasis_` and `__strong__`: an underscore run that opens at
+	// a word edge and closes at one, so snake_case keeps its underscores.
+	emphRE = regexp.MustCompile(`(^|\W)_+([^_\s](?:[^_]*[^_\s])?)_+(\W|$)`)
 )
 
 // anchor is a heading of the page: its slug (markdownweb's rule) and the line
@@ -23,11 +33,14 @@ type anchor struct {
 	line int
 }
 
-// headingTexts returns the plain text of each ATX heading of Markdown src, in
-// order, leaving out lines inside a code fence.
+// headingTexts returns the plain text of each ATX and Setext heading of
+// Markdown src, in order, leaving out lines inside a code fence. A Setext
+// heading is one paragraph line over an `===` or `---` underline.
 func headingTexts(src string) []string {
 	var out []string
 	fence := ""
+	prev, prevBlank := "", true // the line above, and whether the one above it was blank
+	prevIsPara := false
 	for _, line := range strings.Split(src, "\n") {
 		if m := fenceRE.FindStringSubmatch(line); m != nil {
 			switch fence {
@@ -36,17 +49,44 @@ func headingTexts(src string) []string {
 			case m[1]:
 				fence = ""
 			}
+			prevIsPara = false
+			prevBlank = true
 			continue
 		}
 		if fence != "" {
 			continue
 		}
 		if m := headingRE.FindStringSubmatch(line); m != nil {
-			t := mdLinkRE.ReplaceAllString(markerStrp.ReplaceAllString(m[1], ""), "$1")
-			out = append(out, strings.TrimSpace(markupStrp.Replace(t)))
+			out = append(out, plainHeading(m[1]))
+			prevIsPara = false
+			prevBlank = true
+			continue
 		}
+		if prevIsPara && setextRE.MatchString(line) {
+			out = append(out, plainHeading(prev))
+			prevIsPara = false
+			prevBlank = true
+			continue
+		}
+		blank := strings.TrimSpace(line) == ""
+		prevIsPara = !blank && prevBlank && !notParaRE.MatchString(line)
+		prev, prevBlank = line, blank
 	}
 	return out
+}
+
+// plainHeading is a heading's text with its Markdown taken out: link markers,
+// links (their text stays), `*`, backticks and `_emphasis_`.
+func plainHeading(s string) string {
+	t := mdLinkRE.ReplaceAllString(markerStrp.ReplaceAllString(s, ""), "$1")
+	t = strings.TrimSpace(markupStrp.Replace(t))
+	for {
+		u := emphRE.ReplaceAllString(t, "$1$2$3")
+		if u == t {
+			return t
+		}
+		t = u
+	}
 }
 
 // findAnchors slugs the headings of the cleaned Markdown and finds each on a
@@ -66,8 +106,17 @@ func findAnchors(clean, text string) []anchor {
 		if sl == "" || len(words) == 0 {
 			continue
 		}
+		// A heading that fits on one line is the whole line, which a body
+		// line that merely starts with its words is not. A long heading
+		// wraps, so then its first one to three words will do.
 		found := -1
-		for n := min(3, len(words)); n >= 1 && found < 0; n-- { // a long heading may wrap
+		whole := strings.Join(words, " ")
+		for i := cur; i < len(lines) && found < 0; i++ {
+			if lines[i] == whole {
+				found = i
+			}
+		}
+		for n := min(3, len(words)); n >= 1 && found < 0; n-- {
 			want := strings.Join(words[:n], " ")
 			for i := cur; i < len(lines); i++ {
 				if strings.HasPrefix(lines[i], want) {

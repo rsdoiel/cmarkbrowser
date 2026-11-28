@@ -74,8 +74,8 @@ github.com/remyoudompheng/bigfft v0.0.0-20230129092748-24d4a6f8daec h1:W09IVJc94
 github.com/remyoudompheng/bigfft v0.0.0-20230129092748-24d4a6f8daec/go.mod h1:qqbHyh8v60DhA7CoWK5oRCqLrMHRGoxYCSS9EjAz6Eo=
 github.com/rivo/uniseg v0.4.7 h1:WUdvkW8uEhrYfLC4ZzdpI2ztxP1I582+49Oc5Mq64VQ=
 github.com/rivo/uniseg v0.4.7/go.mod h1:FN3SvrM+Zdj16jyLfmOkMNblXMcoc8DfTHruCPUcx88=
-github.com/rsdoiel/cmarkfind v0.0.2-0.20261128030734-c27cb082936c h1:XWe2lZbC0MiVwrQKureHOWkgZAflvYQwGUX70nVnGaM=
-github.com/rsdoiel/cmarkfind v0.0.2-0.20261128030734-c27cb082936c/go.mod h1:70PUTgyoF6e9sSQ/YCSm6yMVhPTqFh2r7v6LWksT6bM=
+github.com/rsdoiel/cmarkfind v0.0.2-0.20261128033905-19963db3c092 h1:G3+lr12dSxdkKCKZVBg8i9tDYiRieXdX7l1b/Kw1WpE=
+github.com/rsdoiel/cmarkfind v0.0.2-0.20261128033905-19963db3c092/go.mod h1:70PUTgyoF6e9sSQ/YCSm6yMVhPTqFh2r7v6LWksT6bM=
 github.com/rsdoiel/frontmatter v0.0.1 h1:cSAwuuOC1n3OG1W8BzyirqSE7Ee8PM5MlL7bgXrHAco=
 github.com/rsdoiel/frontmatter v0.0.1/go.mod h1:EzaB3V/d6vlxOsAubcX5hH4bTGYuLEPhq72iyu8bhVY=
 github.com/rsdoiel/markdownweb v0.0.6 h1:q7mXRWd1N9gbWHZpNvZTkce1y+yn1fHZ4eqB/9rVWaw=
